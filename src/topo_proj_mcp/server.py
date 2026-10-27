@@ -1,7 +1,9 @@
 """MCP server exposing the topological task planner as tools."""
 
+import os
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -18,7 +20,8 @@ mcp = MCPServer(
         "Task names are the IDs. Times are in hours."
     ),
 )
-project = Project()
+project_file = Path(os.environ.get("TOPO_PROJECT_FILE", "project.json"))
+project = Project.load(project_file)
 
 EDIT = ToolAnnotations(
     read_only_hint=False,
@@ -36,6 +39,12 @@ def plan_errors() -> Iterator[None]:
         yield
     except PlanError as error:
         raise ToolError(str(error)) from error
+
+
+def save_and_render() -> str:
+    """Save the project after an edit and return the updated plan."""
+    project.save(project_file)
+    return project.render()
 
 
 @mcp.tool(annotations=EDIT)
@@ -67,7 +76,7 @@ def topo_add_task(
     )
     with plan_errors():
         project.add_task(task, dependents or ())
-    return project.render()
+    return save_and_render()
 
 
 @mcp.tool(annotations=EDIT)
@@ -101,7 +110,7 @@ def topo_update_task(
             depends_on=depends_on,
             dependents=dependents,
         )
-    return project.render()
+    return save_and_render()
 
 
 @mcp.tool(
@@ -122,7 +131,7 @@ def topo_remove_task(name: str, bridge: bool = True) -> str:
     """
     with plan_errors():
         project.remove_task(name, bridge)
-    return project.render()
+    return save_and_render()
 
 
 @mcp.tool(
@@ -149,6 +158,7 @@ def topo_set_status(
     """
     with plan_errors():
         project.set_status(name, status, actual_hours)
+    project.save(project_file)
     return f"{name}: {status}.\n\n{project.render_next()}"
 
 

@@ -1,12 +1,15 @@
 """Module for the task dependency graph: validation, topological stages and rendering."""
 
+import json
 import logging
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from graphlib import CycleError, TopologicalSorter
+from pathlib import Path
 from statistics import mean
+from typing import TypedDict
 
-from topo_proj_mcp.models import PriorityLevel, Status, Task
+from topo_proj_mcp.models import PriorityLevel, Status, Task, TaskJSON
 
 type Edges = dict[str, set[str]]
 """Maps each task name to the names it depends on."""
@@ -26,6 +29,10 @@ class PlanError(ValueError):
     pass
 
 
+class ProjectJSON(TypedDict):
+    tasks: list[TaskJSON]
+
+
 def check_estimate(estimated_time: float) -> None:
     """Raise PlanError unless the estimate is a positive number of hours."""
     if estimated_time <= 0:
@@ -35,6 +42,30 @@ def check_estimate(estimated_time: float) -> None:
 class Project:
     def __init__(self) -> None:
         self.tasks: dict[str, Task] = {}
+
+    @classmethod
+    def load(cls, path: Path) -> Project:
+        """Load a project from JSON; a missing file gives an empty project.
+
+        Raises:
+            PlanError: If the file describes an invalid graph.
+        """
+        project = cls()
+        if not path.exists():
+            return project
+        data: ProjectJSON = json.loads(path.read_text(encoding="utf-8"))
+        project.tasks = {item["name"]: Task.from_json(item) for item in data["tasks"]}
+        validate(project.edges())
+        return project
+
+    def save(self, path: Path) -> None:
+        """Write the project to JSON atomically, so a crash never leaves half a file."""
+        data: ProjectJSON = {"tasks": [task.to_json() for task in self.tasks.values()]}
+        temp = path.with_name(path.name + ".tmp")
+        temp.write_text(
+            json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        temp.replace(path)
 
     def edges(self) -> Edges:
         """Return a copy of the graph that can be edited without touching the tasks."""

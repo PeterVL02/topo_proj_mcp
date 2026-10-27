@@ -80,7 +80,7 @@ ranked by V.
 
 **Verification:** pytest walks the diamond graph using only `next_tasks` and `update_status` · **Dependencies:** 3 · **Files:** `models.py`, `task_sorting.py`, `server.py`, tests · **Scope:** S
 
-## Task 6: JSON persistence
+## Task 6: JSON persistence ✅
 
 **Description:** Load on startup and save after every change, to `TOPO_PROJECT_FILE` (default
 `./project.json`), using stdlib `json` and an atomic write (temp file, then `os.replace`).

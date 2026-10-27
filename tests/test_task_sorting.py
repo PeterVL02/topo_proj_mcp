@@ -1,6 +1,7 @@
 """Tests for the Project graph: building, sorting, scoring, timing and persistence."""
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -236,3 +237,19 @@ def test_invalid_actual_hours_rejected(status: Status, hours: float) -> None:
     """actual_hours is only for completion and must be positive."""
     with pytest.raises(PlanError, match="actual_hours"):
         make_diamond().set_status("A", status, actual_hours=hours)
+
+
+def test_save_and_load_round_trip(tmp_path: Path) -> None:
+    """Every field, edge, status and timestamp survives a save and load."""
+    start = datetime(2026, 1, 1, 9, tzinfo=UTC)
+    project = make_diamond()
+    project.set_status("A", Status.IN_PROGRESS, now=start)
+    project.set_status("A", Status.COMPLETED, now=start + timedelta(hours=3))
+    path = tmp_path / "project.json"
+    project.save(path)
+    assert Project.load(path).tasks == project.tasks
+
+
+def test_load_missing_file_gives_empty_project(tmp_path: Path) -> None:
+    """A project file that doesn't exist yet means an empty plan."""
+    assert Project.load(tmp_path / "nope.json").tasks == {}

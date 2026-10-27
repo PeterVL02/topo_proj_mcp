@@ -103,7 +103,7 @@ The editing tools are:
 
 ### Phase 3: Execution
 - [x] Task 5: Progress tracking with timestamps and `next_tasks`
-- [ ] Task 6: JSON persistence
+- [x] Task 6: JSON persistence
 
 ### Checkpoint: Plans survive restarts, and the full flow works
 

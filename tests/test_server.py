@@ -1,6 +1,7 @@
 """End-to-end tests that call the MCP tools in-process."""
 
 import asyncio
+from pathlib import Path
 
 import pytest
 
@@ -9,9 +10,12 @@ from topo_proj_mcp.task_sorting import Project
 
 
 @pytest.fixture(autouse=True)
-def fresh_project(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Give every test an empty project."""
+def project_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    """Give every test an empty project saved to a temporary file."""
+    path = tmp_path / "project.json"
     monkeypatch.setattr(server, "project", Project())
+    monkeypatch.setattr(server, "project_file", path)
+    return path
 
 
 def call(tool: str, **arguments: object) -> str:
@@ -55,3 +59,9 @@ def test_set_status_shows_what_is_next() -> None:
     assert "] b " not in call("topo_next_tasks")
     text = call("topo_set_status", name="a", status="completed")
     assert "Ready now" in text and "] b " in text
+
+
+def test_edits_are_saved_to_the_project_file(project_file: Path) -> None:
+    """Every successful edit is written to disk so the plan survives restarts."""
+    call("topo_add_task", name="a", estimated_time=1)
+    assert Project.load(project_file).tasks.keys() == {"a"}
