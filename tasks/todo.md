@@ -93,7 +93,7 @@ ranked by V.
 
 ## Checkpoint: Plans survive restarts, and the full flow works
 
-## Task 7: Eta and budgeted next_tasks
+## Task 7: Eta and budgeted next_tasks ✅
 
 **Description:** Add `Project.etas()` using the longest path (`est + max eta(dependencies)`, with
 completed tasks at 0) and show it in `get_plan`. Add `next_tasks(budget_hours=...)`: a greedy

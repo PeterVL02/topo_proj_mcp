@@ -163,14 +163,18 @@ def topo_set_status(
 
 
 @mcp.tool(annotations=READ)
-def topo_next_tasks(gamma: float = DEFAULT_GAMMA) -> str:
+def topo_next_tasks(gamma: float = DEFAULT_GAMMA, budget: float | None = None) -> str:
     """Return the tasks that can be worked on now, highest value first.
+
+    With a budget, return an ordered work list that fits in that many hours instead:
+    it may include tasks that become ready once earlier picks are done.
 
     Args:
         gamma: Discount per average task duration, in (0, 1]. Lower favours quick wins.
+        budget: Hours available. Omit to list everything that is ready now.
     """
     with plan_errors():
-        return project.render_next(gamma)
+        return project.render_next(gamma, budget)
 
 
 @mcp.tool(annotations=READ)

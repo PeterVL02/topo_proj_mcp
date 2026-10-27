@@ -232,31 +232,77 @@ class Project:
                 else:
                     task.actual_time = None
 
-    def next_tasks(self, gamma: float = DEFAULT_GAMMA) -> list[str]:
-        """Return unfinished tasks whose dependencies are all completed, best value first."""
-        values = self.values(gamma)
-        ready = [
-            name
-            for name, task in self.tasks.items()
-            if task.status is not Status.COMPLETED
-            and all(self.tasks[d].status is Status.COMPLETED for d in task.depends_on)
-        ]
-        return sorted(ready, key=lambda n: (-values[n], n))
+    def next_tasks(
+        self, gamma: float = DEFAULT_GAMMA, budget: float | None = None
+    ) -> list[str]:
+        """Return tasks to work on next, best value first.
 
-    def render_next(self, gamma: float = DEFAULT_GAMMA) -> str:
-        """Return the ready tasks as text, best value first."""
-        names = self.next_tasks(gamma)
+        Without a budget: every unfinished task whose dependencies are all completed.
+        With a budget (hours): simulate working through the plan, repeatedly taking the
+        highest-value ready task that still fits, so later picks may depend on earlier ones.
+
+        Raises:
+            PlanError: If gamma is out of range or the budget is not positive.
+        """
+        values = self.values(gamma)
+        done = {n for n, t in self.tasks.items() if t.status is Status.COMPLETED}
+
+        def ready() -> list[str]:
+            """Return unfinished tasks whose dependencies are all in `done`, best first."""
+            names = [
+                n
+                for n, t in self.tasks.items()
+                if n not in done and t.depends_on <= done
+            ]
+            return sorted(names, key=lambda n: (-values[n], n))
+
+        if budget is None:
+            return ready()
+        if budget <= 0:
+            raise PlanError(f"budget must be > 0 hours, got {budget}.")
+        # ponytail: greedy by value; optimal picking is knapsack with precedence (NP-hard)
+        picked: list[str] = []
+        remaining = budget
+        while fits := [n for n in ready() if self.tasks[n].estimated_time <= remaining]:
+            picked.append(fits[0])
+            done.add(fits[0])
+            remaining -= self.tasks[fits[0]].estimated_time
+        return picked
+
+    def etas(self) -> dict[str, float]:
+        """Return each task's earliest finish in hours from now, via the longest path.
+
+        A task can't start until all its dependencies finish, so its eta is its own
+        estimate plus the largest eta among its dependencies. Completed tasks take 0 hours.
+        """
+        etas: dict[str, float] = {}
+        for name in TopologicalSorter(self.edges()).static_order():
+            task = self.tasks[name]
+            own = 0.0 if task.status is Status.COMPLETED else task.estimated_time
+            etas[name] = own + max((etas[d] for d in task.depends_on), default=0.0)
+        return etas
+
+    def render_next(
+        self, gamma: float = DEFAULT_GAMMA, budget: float | None = None
+    ) -> str:
+        """Return the output of `next_tasks` as text."""
         if not self.tasks:
             return "No tasks yet. Add one with topo_add_task."
-        if not names:  # some unfinished task is always ready, so this means all done
+        names = self.next_tasks(gamma, budget)
+        if budget is not None:
+            used = sum(self.tasks[n].estimated_time for n in names)
+            header = (
+                f"Best picks for the budget, in order ({used:g} of {budget:g}h used):"
+            )
+            if not names:
+                return f"Nothing unfinished fits in {budget:g}h."
+        elif names:
+            header = "Ready now (best value first):"
+        else:  # some unfinished task is always ready, so this means all done
             return "All tasks are done."
-        values = self.values(gamma)
-        children = self.children()
-        lines = ["Ready now (best value first):"]
-        lines.extend(
-            f"  {i}. {self.describe(n, values[n], children[n])}"
-            for i, n in enumerate(names, start=1)
-        )
+        described = self.describe_all(self.values(gamma))
+        lines = [header]
+        lines.extend(f"  {i}. {described[n]}" for i, n in enumerate(names, start=1))
         return "\n".join(lines)
 
     def require(self, name: str) -> Task:
@@ -288,7 +334,7 @@ class Project:
         if not self.tasks:
             return "No tasks yet. Add one with topo_add_task."
         values = self.values(gamma)
-        children = self.children()
+        described = self.describe_all(values)
         done = sum(task.status is Status.COMPLETED for task in self.tasks.values())
         scale = mean(task.estimated_time for task in self.tasks.values())
         header = (
@@ -299,21 +345,25 @@ class Project:
         for number, stage in enumerate(self.stages(), start=1):
             lines.append(f"Stage {number}")
             for name in sorted(stage, key=lambda n: (-values[n], n)):
-                lines.append(f"  {self.describe(name, values[name], children[name])}")
+                lines.append(f"  {described[name]}")
         return "\n".join(lines)
 
-    def describe(self, name: str, value: float, children: set[str]) -> str:
-        """Return one line describing a task, its value and its edges."""
-        task = self.tasks[name]
-        line = (
-            f"{STATUS_MARKERS[task.status]} {name}  {task.priority.upper()}"
-            f"  est {task.estimated_time:g}h  V={value:.2f}"
-        )
-        if task.depends_on:
-            line += "  ← " + ", ".join(sorted(task.depends_on))
-        if children:
-            line += "  → " + ", ".join(sorted(children))
-        return line
+    def describe_all(self, values: dict[str, float]) -> dict[str, str]:
+        """Return one line per task: status, priority, estimate, eta, value and edges."""
+        etas = self.etas()
+        children = self.children()
+        described: dict[str, str] = {}
+        for name, task in self.tasks.items():
+            line = (
+                f"{STATUS_MARKERS[task.status]} {name}  {task.priority.upper()}"
+                f"  est {task.estimated_time:g}h  eta {etas[name]:g}h  V={values[name]:.2f}"
+            )
+            if task.depends_on:
+                line += "  ← " + ", ".join(sorted(task.depends_on))
+            if children[name]:
+                line += "  → " + ", ".join(sorted(children[name]))
+            described[name] = line
+        return described
 
 
 def link_dependents(edges: Edges, name: str, dependents: Iterable[str]) -> None:

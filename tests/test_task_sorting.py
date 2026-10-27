@@ -253,3 +253,39 @@ def test_save_and_load_round_trip(tmp_path: Path) -> None:
 def test_load_missing_file_gives_empty_project(tmp_path: Path) -> None:
     """A project file that doesn't exist yet means an empty plan."""
     assert Project.load(tmp_path / "nope.json").tasks == {}
+
+
+def make_timed_diamond() -> Project:
+    """Diamond with estimates A=1, B=2, C=5, D=1."""
+    project = make_diamond()
+    for name, hours in {"A": 1, "B": 2, "C": 5, "D": 1}.items():
+        project.update_task(name, estimated_time=hours)
+    return project
+
+
+def test_eta_is_the_longest_path() -> None:
+    """D can't finish before its slowest chain A -> C -> D: 1 + 5 + 1 = 7."""
+    project = make_timed_diamond()
+    assert project.etas() == {"A": 1, "B": 3, "C": 6, "D": 7}
+    project.set_status("A", Status.COMPLETED)
+    assert project.etas()["D"] == 6
+    assert "eta 7h" in make_timed_diamond().render()
+
+
+@pytest.mark.parametrize(
+    ("budget", "expected"), [(4, ["A", "B"]), (9, ["A", "B", "C", "D"]), (0.5, [])]
+)
+def test_budget_selection(budget: float, expected: list[str]) -> None:
+    """Greedy picks respect dependencies and never exceed the budget."""
+    project = make_timed_diamond()
+    picked = project.next_tasks(budget=budget)
+    assert picked == expected
+    assert sum(project.tasks[n].estimated_time for n in picked) <= budget
+    for i, name in enumerate(picked):
+        assert project.tasks[name].depends_on <= set(picked[:i])
+
+
+def test_non_positive_budget_is_rejected() -> None:
+    """A budget must be a positive number of hours."""
+    with pytest.raises(PlanError, match="budget"):
+        make_diamond().next_tasks(budget=0)

@@ -65,3 +65,11 @@ def test_edits_are_saved_to_the_project_file(project_file: Path) -> None:
     """Every successful edit is written to disk so the plan survives restarts."""
     call("topo_add_task", name="a", estimated_time=1)
     assert Project.load(project_file).tasks.keys() == {"a"}
+
+
+def test_next_tasks_with_budget() -> None:
+    """The budget variant lists picks in order and the hours they use."""
+    call("topo_add_task", name="a", estimated_time=1)
+    call("topo_add_task", name="b", estimated_time=3, depends_on=["a"])
+    text = call("topo_next_tasks", budget=2)
+    assert "1 of 2h" in text and "] a " in text and "] b " not in text

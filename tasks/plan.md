@@ -108,7 +108,7 @@ The editing tools are:
 ### Checkpoint: Plans survive restarts, and the full flow works
 
 ### Phase 4: Time
-- [ ] Task 7: Earliest finish (eta) and budgeted `next_tasks`
+- [x] Task 7: Earliest finish (eta) and budgeted `next_tasks`
 - [ ] Task 8: `time_report`, estimate vs actual
 
 ### Checkpoint: Complete
