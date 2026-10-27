@@ -59,7 +59,7 @@ def test_set_status_shows_what_is_next() -> None:
     call("topo_add_task", name="b", estimated_time=1, depends_on=["a"])
     assert "] b " not in call("topo_next_tasks")
     text = call("topo_set_status", name="a", status="completed")
-    assert "Ready now" in text and "] b " in text
+    assert "Newly ready: b." in text and "Next best: b." in text
 
 
 def test_edits_are_saved_to_the_project_file(project_file: Path) -> None:
@@ -139,3 +139,52 @@ def test_server_recovers_once_the_file_is_fixed(
     monkeypatch.setattr(server, "load_error", "JSONDecodeError: bad")
     assert not project_file.exists()  # the user deleted the broken file
     assert "No tasks yet" in call("topo_get_plan")
+
+
+def test_add_tasks_builds_a_plan_in_one_call() -> None:
+    """The batch tool takes a whole plan, forward references included."""
+    plan = call(
+        "topo_add_tasks",
+        tasks=[
+            {"name": "b", "estimated_time": 1, "depends_on": ["a"]},
+            {"name": "a", "estimated_time": 2, "priority": "high"},
+        ],
+    )
+    assert plan.index("] a ") < plan.index("] b ") and "Stage 2" in plan
+
+
+def build_chain(size: int) -> None:
+    """Add a chain of `size` tasks through the batch tool."""
+    call(
+        "topo_add_tasks",
+        tasks=[
+            {
+                "name": f"t{i}",
+                "estimated_time": 1,
+                "depends_on": [f"t{i - 1}"] if i else [],
+            }
+            for i in range(size)
+        ],
+    )
+
+
+def edit_replies() -> list[str]:
+    """Run one of each edit tool on the current plan and return the replies."""
+    return [
+        call("topo_add_task", name="extra", estimated_time=1, depends_on=["t0"]),
+        call("topo_update_task", name="extra", priority="high"),
+        call("topo_set_status", name="t0", status="completed"),
+        call("topo_remove_task", name="extra"),
+    ]
+
+
+def test_edit_replies_do_not_grow_with_the_plan() -> None:
+    """Edits answer with one line, not the whole plan, so building stays linear."""
+    build_chain(5)
+    small = edit_replies()
+    server.project = Project()
+    build_chain(50)
+    large = edit_replies()
+    for short, long in zip(small, large, strict=True):
+        assert len(long) <= len(short) + 10, (short, long)
+    assert "Stage" not in "".join(large)

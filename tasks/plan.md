@@ -198,8 +198,8 @@ harden the plugin or cut it back.
 ### Checkpoint: baseline numbers recorded in `bench/results.md`
 
 ### Phase 7: Fix the token leak
-- [ ] Task 14: Edits return a short confirmation instead of the full plan
-- [ ] Task 15: `topo_add_tasks` adds a whole plan in one atomic call; the skill prefers it
+- [x] Task 14: Edits return a short confirmation instead of the full plan
+- [x] Task 15: `topo_add_tasks` adds a whole plan in one atomic call; the skill prefers it
 - [ ] Task 16: Re-run the benchmark and compare against the baseline
 
 ### Checkpoint: decide with the human (Phase 8)

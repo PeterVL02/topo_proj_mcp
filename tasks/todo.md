@@ -184,7 +184,7 @@ dependency-order violations.
 
 ## Checkpoint: baseline recorded
 
-## Task 14: Short edit replies
+## Task 14: Short edit replies ✅
 
 **Description:** `add` / `update` / `remove` / `set_status` reply with a single line describing
 the change (for example `added api: stage 2, ← schema, V=1.76`), plus anything that became ready
@@ -196,7 +196,7 @@ or blocked. `topo_get_plan` stays the only full view. Update the skill to say so
 
 **Verification:** pytest · **Dependencies:** 13 · **Files:** `server.py`, `task_sorting.py`, `SKILL.md`, tests · **Scope:** S
 
-## Task 15: Batch add
+## Task 15: Batch add ✅
 
 **Description:** Add `topo_add_tasks(tasks: list[...])`. Tasks in one batch can reference each
 other in any order. The whole batch is validated as one graph edit, and it either fully applies or
