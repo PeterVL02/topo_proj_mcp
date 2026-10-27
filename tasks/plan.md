@@ -92,8 +92,8 @@ The editing tools are:
 ## Task List
 
 ### Phase 1: Foundation
-- [ ] Task 1: MCP server skeleton (`ping`) running from Claude Code
-- [ ] Task 2: Add tasks and view the plan as staged text
+- [x] Task 1: MCP server skeleton (`ping`) running from Claude Code
+- [x] Task 2: Add tasks and view the plan as staged text
 
 ### Phase 2: Core
 - [ ] Task 3: Discounted value ordering

@@ -3,7 +3,7 @@
 See `tasks/plan.md` for the design. Every task finishes with `uv run ruff check`, `uv run ruff format`
 and `uv run pytest` all passing.
 
-## Task 1: MCP server skeleton
+## Task 1: MCP server skeleton ✅
 
 **Description:** Add `server.py` with a `FastMCP` instance and a `ping` tool. `__init__.main()`
 runs the server over stdio. Replace the hello `print`, because stdout is the protocol channel.
@@ -17,7 +17,7 @@ runs the server over stdio. Replace the hello `print`, because stdout is the pro
 
 **Dependencies:** None · **Files:** `__init__.py`, `server.py` · **Scope:** XS
 
-## Task 2: Add tasks and view the plan as staged text
+## Task 2: Add tasks and view the plan as staged text ✅
 
 **Description:** Make `Task` a dataclass with `depends_on: set[str]`, and drop the stored
 `dependents`, `_priority_value` and `discounted_count`. Add `Project` (`dict[str, Task]`) to
