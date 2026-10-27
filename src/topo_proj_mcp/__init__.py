@@ -1,3 +1,5 @@
 def main() -> None:
-    """Entry point for the topo-proj-mcp script."""
-    print("Hello from topo-proj-mcp!")
+    """Run the topo-proj-mcp server over stdio."""
+    from topo_proj_mcp.server import mcp
+
+    mcp.run()

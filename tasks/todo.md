@@ -3,7 +3,7 @@
 See `tasks/plan.md` for the design. Every task finishes with `uv run ruff check`, `uv run ruff format`
 and `uv run pytest` all passing.
 
-## Task 1: MCP server skeleton
+## Task 1: MCP server skeleton ✅
 
 **Description:** Add `server.py` with a `FastMCP` instance and a `ping` tool. `__init__.main()`
 runs the server over stdio. Replace the hello `print`, because stdout is the protocol channel.
@@ -17,7 +17,7 @@ runs the server over stdio. Replace the hello `print`, because stdout is the pro
 
 **Dependencies:** None · **Files:** `__init__.py`, `server.py` · **Scope:** XS
 
-## Task 2: Add tasks and view the plan as staged text
+## Task 2: Add tasks and view the plan as staged text ✅
 
 **Description:** Make `Task` a dataclass with `depends_on: set[str]`, and drop the stored
 `dependents`, `_priority_value` and `discounted_count`. Add `Project` (`dict[str, Task]`) to
@@ -35,7 +35,7 @@ runs the server over stdio. Replace the hello `print`, because stdout is the pro
 
 **Dependencies:** 1 · **Files:** `models.py`, `task_sorting.py`, `server.py`, `tests/test_task_sorting.py` · **Scope:** M
 
-## Task 3: Discounted value ordering
+## Task 3: Discounted value ordering ✅
 
 **Description:** Add `Project.values(gamma) -> dict[str, float]` using
 `V = γ^(est/τ)·(base + max V(dependents))` (τ = mean estimate) in reverse topological order; completed tasks have V = 0.
@@ -48,7 +48,7 @@ runs the server over stdio. Replace the hello `print`, because stdout is the pro
 
 **Verification:** pytest for the cases above · **Dependencies:** 2 · **Files:** `task_sorting.py`, `server.py`, tests · **Scope:** S
 
-## Task 4: Edit the graph
+## Task 4: Edit the graph ✅
 
 **Description:** Add the tools `update_task(name, description?, priority?, estimated_time?,
 depends_on?, dependents?)` (a given list replaces that side's edges, which is how a task is moved)
@@ -66,7 +66,7 @@ and `remove_task(name, bridge=True)`.
 - [ ] Manual: have Claude plan a small real project through the tools, then reshape it
 - [ ] Review with human
 
-## Task 5: Progress tracking
+## Task 5: Progress tracking ✅
 
 **Description:** Add the tool `update_status(name, status, actual_hours=None)`. It sets
 `started_at`/`completed_at` (UTC) and logs the transition to stderr. Add
@@ -80,7 +80,7 @@ ranked by V.
 
 **Verification:** pytest walks the diamond graph using only `next_tasks` and `update_status` · **Dependencies:** 3 · **Files:** `models.py`, `task_sorting.py`, `server.py`, tests · **Scope:** S
 
-## Task 6: JSON persistence
+## Task 6: JSON persistence ✅
 
 **Description:** Load on startup and save after every change, to `TOPO_PROJECT_FILE` (default
 `./project.json`), using stdlib `json` and an atomic write (temp file, then `os.replace`).
@@ -93,7 +93,7 @@ ranked by V.
 
 ## Checkpoint: Plans survive restarts, and the full flow works
 
-## Task 7: Eta and budgeted next_tasks
+## Task 7: Eta and budgeted next_tasks ✅
 
 **Description:** Add `Project.etas()` using the longest path (`est + max eta(dependencies)`, with
 completed tasks at 0) and show it in `get_plan`. Add `next_tasks(budget_hours=...)`: a greedy
@@ -105,7 +105,7 @@ simulation that picks the best `V/est` among ready tasks that still fit the budg
 
 **Verification:** pytest · **Dependencies:** 5 · **Files:** `task_sorting.py`, `server.py`, tests · **Scope:** S
 
-## Task 8: Time report
+## Task 8: Time report ✅
 
 **Description:** Add the tool `time_report()`: for each completed task, the estimate, the actual
 time (`actual_hours`, or the wall-clock time between start and completion) and their ratio, plus

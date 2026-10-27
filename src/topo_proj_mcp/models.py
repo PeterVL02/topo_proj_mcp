@@ -1,6 +1,9 @@
 """Module for defining data structures and models."""
 
+from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
+from typing import TypedDict
 
 
 class Status(StrEnum):
@@ -22,78 +25,70 @@ PRIORITY_MAPPING: dict[PriorityLevel, float] = {
 }
 
 
+@dataclass
 class Task:
-    def __init__(
-        self,
-        name: str,
-        description: str,
-        priority: PriorityLevel,
-        estimated_time: float,
-        status: Status = Status.NOT_STARTED,
-        depends_on: list[Task] | None = None,
-        dependents: list[Task] | None = None,
-    ) -> None:
-        self.name = name
-        self.description = description
-        self.priority = priority
-        self.estimated_time = estimated_time
-        self.status = status
-        self.depends_on = depends_on
-        self.dependents = dependents
-        self._priority_value: float = PRIORITY_MAPPING[priority]
-        self.discounted_count: int = 0
-
-    def update_status(self, new_status: Status) -> None:
-        """Update the status of the task."""
-        self.status = new_status
-
-    def update_priority(self, new_priority: PriorityLevel) -> None:
-        """Update the priority of the task and reapply previous discounts."""
-        self.priority = new_priority
-        self._priority_value = PRIORITY_MAPPING[new_priority]
-        for _ in range(self.discounted_count):
-            self._priority_value *= 0.9
-
-    def discount_priority_value(self, gamma: float) -> None:
-        """Apply a discount factor to the priority value of the task."""
-        self._priority_value = round(self._priority_value * gamma, 3)
-        self.discounted_count += 1
+    name: str
+    description: str
+    priority: PriorityLevel
+    estimated_time: float
+    status: Status = Status.NOT_STARTED
+    depends_on: set[str] = field(default_factory=set)
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    actual_time: float | None = None
 
     @property
-    def priority_value(self) -> float:
-        """Return the current (possibly discounted) priority value."""
-        return self._priority_value
+    def base_value(self) -> float:
+        """Return the undiscounted reward for finishing this task."""
+        return PRIORITY_MAPPING[self.priority]
 
-    def __repr__(self) -> str:
-        """Return a readable representation including dependency names."""
-        depends_on = (
-            [task.name for task in self.depends_on] if self.depends_on else None
-        )
-        dependents = (
-            [task.name for task in self.dependents] if self.dependents else None
-        )
-        return (
-            f"Task(name={self.name}, description={self.description}, "
-            f"priority={self.priority}, priority_value={self.priority_value}, "
-            f"estimated_time={self.estimated_time}, status={self.status}, "
-            f"depends_on={depends_on}, dependents={dependents})"
+    def to_json(self) -> TaskJSON:
+        """Return a JSON-serialisable dict of this task."""
+        return {
+            "name": self.name,
+            "description": self.description,
+            "priority": self.priority,
+            "estimated_time": self.estimated_time,
+            "status": self.status,
+            "depends_on": sorted(self.depends_on),
+            "started_at": format_time(self.started_at),
+            "completed_at": format_time(self.completed_at),
+            "actual_time": self.actual_time,
+        }
+
+    @classmethod
+    def from_json(cls, data: TaskJSON) -> Task:
+        """Build a task from the dict produced by `to_json`."""
+        return cls(
+            name=data["name"],
+            description=data["description"],
+            priority=PriorityLevel(data["priority"]),
+            estimated_time=data["estimated_time"],
+            status=Status(data["status"]),
+            depends_on=set(data["depends_on"]),
+            started_at=parse_time(data["started_at"]),
+            completed_at=parse_time(data["completed_at"]),
+            actual_time=data["actual_time"],
         )
 
 
-if __name__ == "__main__":
-    task1 = Task(
-        name="Design Database Schema",
-        description="Create the initial database schema for the project.",
-        priority=PriorityLevel.HIGH,
-        estimated_time=5.0,
-    )
-    task2 = Task(
-        name="Implement Authentication",
-        description="Develop the user authentication module.",
-        priority=PriorityLevel.MEDIUM,
-        estimated_time=8.0,
-    )
-    for _ in range(3):
-        task1.discount_priority_value(0.9)
-    print(task1)
-    print(task2)
+class TaskJSON(TypedDict):
+    name: str
+    description: str
+    priority: str
+    estimated_time: float
+    status: str
+    depends_on: list[str]
+    started_at: str | None
+    completed_at: str | None
+    actual_time: float | None
+
+
+def format_time(moment: datetime | None) -> str | None:
+    """Return an ISO 8601 string, or None."""
+    return moment.isoformat() if moment else None
+
+
+def parse_time(text: str | None) -> datetime | None:
+    """Parse an ISO 8601 string, or return None."""
+    return datetime.fromisoformat(text) if text else None

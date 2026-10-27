@@ -92,24 +92,24 @@ The editing tools are:
 ## Task List
 
 ### Phase 1: Foundation
-- [ ] Task 1: MCP server skeleton (`ping`) running from Claude Code
-- [ ] Task 2: Add tasks and view the plan as staged text
+- [x] Task 1: MCP server skeleton (`ping`) running from Claude Code
+- [x] Task 2: Add tasks and view the plan as staged text
 
 ### Phase 2: Core
-- [ ] Task 3: Discounted value ordering
-- [ ] Task 4: Edit the graph: update/move/remove
+- [x] Task 3: Discounted value ordering
+- [x] Task 4: Edit the graph: update/move/remove
 
 ### Checkpoint: A model can build and reshape a plan
 
 ### Phase 3: Execution
-- [ ] Task 5: Progress tracking with timestamps and `next_tasks`
-- [ ] Task 6: JSON persistence
+- [x] Task 5: Progress tracking with timestamps and `next_tasks`
+- [x] Task 6: JSON persistence
 
 ### Checkpoint: Plans survive restarts, and the full flow works
 
 ### Phase 4: Time
-- [ ] Task 7: Earliest finish (eta) and budgeted `next_tasks`
-- [ ] Task 8: `time_report`, estimate vs actual
+- [x] Task 7: Earliest finish (eta) and budgeted `next_tasks`
+- [x] Task 8: `time_report`, estimate vs actual
 
 ### Checkpoint: Complete
 

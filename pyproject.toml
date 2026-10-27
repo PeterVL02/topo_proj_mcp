@@ -1,7 +1,7 @@
 [project]
 name = "topo-proj-mcp"
 version = "0.1.0"
-description = "Add your description here"
+description = "MCP server for planning tasks as a topologically sorted, time-discounted dependency graph"
 readme = "README.md"
 authors = [
     { name = "PeterVL02", email = "p.vesterenglarsen@gmail.com" }

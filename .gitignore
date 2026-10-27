@@ -8,3 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Planner state (TOPO_PROJECT_FILE default)
+project.json
+project.json.tmp
