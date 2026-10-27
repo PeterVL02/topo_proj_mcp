@@ -138,7 +138,7 @@ the overall ratio of total actual to total estimated time.
 
 **Verification:** pytest · **Files:** `.claude-plugin/*`, `skills/topo-plan/SKILL.md`, `tests/test_plugin.py` · **Scope:** S
 
-## Task 11: Validate, end-to-end check, docs
+## Task 11: Validate, end-to-end check, docs ✅
 
 **Acceptance:**
 - [ ] `claude plugin validate .` passes

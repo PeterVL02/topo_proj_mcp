@@ -3,7 +3,27 @@
 An MCP server for planning work as a dependency graph before doing it. Tasks are sorted
 topologically into stages, and each stage is ordered by an RL-style time-discounted value.
 
-## Register with Claude Code
+## Install as a Claude Code plugin (recommended)
+
+The `topo-planner` plugin bundles the MCP server with a `topo-plan` skill that teaches Claude
+when and how to plan with it. Requires [uv](https://docs.astral.sh/uv/) on your PATH; Python 3.14
+and the dependencies are fetched on first start.
+
+```
+/plugin install topo-planner --marketplace PeterVL02/topo_proj_mcp
+```
+
+On Claude Code before 2.1.275, use two steps instead:
+
+```
+/plugin marketplace add PeterVL02/topo_proj_mcp
+/plugin install topo-planner@topo-planner
+```
+
+Each project gets its own plan, at `<project>/.claude/topo-plan.json`. To try a local checkout
+without installing it, run `claude --plugin-dir /path/to/topo_proj_mcp`.
+
+## Or register only the MCP server
 
 ```sh
 claude mcp add topo -e TOPO_PROJECT_FILE=C:/path/to/plan.json -- uv --directory C:/Users/pvest/code/topo_proj_mcp run topo-proj-mcp
