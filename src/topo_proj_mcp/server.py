@@ -70,6 +70,61 @@ def topo_add_task(
     return project.render()
 
 
+@mcp.tool(annotations=EDIT)
+def topo_update_task(
+    name: str,
+    description: str | None = None,
+    priority: PriorityLevel | None = None,
+    estimated_time: float | None = None,
+    depends_on: list[str] | None = None,
+    dependents: list[str] | None = None,
+) -> str:
+    """Change a task's fields or move it in the plan, and return the updated plan.
+
+    Only the arguments you pass are changed. To move a task, pass depends_on and/or
+    dependents: each list *replaces* that side's edges (pass [] to clear it).
+
+    Args:
+        name: The task to change.
+        description: New description.
+        priority: New priority: low, medium or high.
+        estimated_time: New estimate in hours (> 0).
+        depends_on: New full list of tasks this one waits for.
+        dependents: New full list of tasks that wait for this one.
+    """
+    with plan_errors():
+        project.update_task(
+            name,
+            description=description,
+            priority=priority,
+            estimated_time=estimated_time,
+            depends_on=depends_on,
+            dependents=dependents,
+        )
+    return project.render()
+
+
+@mcp.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
+def topo_remove_task(name: str, bridge: bool = True) -> str:
+    """Remove a task and return the updated plan.
+
+    Args:
+        name: The task to remove.
+        bridge: If true (default), tasks that waited for it now wait for its dependencies
+            instead, so the ordering is preserved. If false, its edges are just dropped.
+    """
+    with plan_errors():
+        project.remove_task(name, bridge)
+    return project.render()
+
+
 @mcp.tool(annotations=READ)
 def topo_get_plan(gamma: float = DEFAULT_GAMMA) -> str:
     """Return the plan as stages; a task appears after everything it depends on.

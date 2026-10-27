@@ -36,3 +36,13 @@ def test_plan_error_reaches_the_model() -> None:
     with pytest.raises(ToolError, match="Unknown task") as info:
         call("topo_add_task", name="api", estimated_time=1, depends_on=["nope"])
     assert not isinstance(info.value, UnexpectedToolError)
+
+
+def test_move_and_remove_through_tools() -> None:
+    """A model can reshape the plan with update and remove."""
+    call("topo_add_task", name="a", estimated_time=1)
+    call("topo_add_task", name="b", estimated_time=1)
+    plan = call("topo_update_task", name="b", depends_on=["a"], priority="high")
+    assert "b  HIGH" in plan and "← a" in plan
+    plan = call("topo_remove_task", name="a")
+    assert "a  " not in plan and "Stage 2" not in plan

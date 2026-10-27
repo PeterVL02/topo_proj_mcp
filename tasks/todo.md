@@ -48,7 +48,7 @@ runs the server over stdio. Replace the hello `print`, because stdout is the pro
 
 **Verification:** pytest for the cases above · **Dependencies:** 2 · **Files:** `task_sorting.py`, `server.py`, tests · **Scope:** S
 
-## Task 4: Edit the graph
+## Task 4: Edit the graph ✅
 
 **Description:** Add the tools `update_task(name, description?, priority?, estimated_time?,
 depends_on?, dependents?)` (a given list replaces that side's edges, which is how a task is moved)

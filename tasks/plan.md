@@ -97,7 +97,7 @@ The editing tools are:
 
 ### Phase 2: Core
 - [x] Task 3: Discounted value ordering
-- [ ] Task 4: Edit the graph: update/move/remove
+- [x] Task 4: Edit the graph: update/move/remove
 
 ### Checkpoint: A model can build and reshape a plan
 

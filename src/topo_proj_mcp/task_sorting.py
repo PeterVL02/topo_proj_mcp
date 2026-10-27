@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from graphlib import CycleError, TopologicalSorter
 from statistics import mean
 
-from topo_proj_mcp.models import Status, Task
+from topo_proj_mcp.models import PriorityLevel, Status, Task
 
 type Edges = dict[str, set[str]]
 """Maps each task name to the names it depends on."""
@@ -96,6 +96,66 @@ class Project:
         self.tasks[task.name] = task
         self.apply_edges(edges)
 
+    def update_task(
+        self,
+        name: str,
+        *,
+        description: str | None = None,
+        priority: PriorityLevel | None = None,
+        estimated_time: float | None = None,
+        depends_on: Iterable[str] | None = None,
+        dependents: Iterable[str] | None = None,
+    ) -> None:
+        """Change a task's fields or move it; a given edge list replaces that side's edges.
+
+        Raises:
+            PlanError: If the task or a referenced task does not exist, the estimate is
+                not positive, or the move would create a cycle.
+        """
+        task = self.require(name)
+        if estimated_time is not None:
+            check_estimate(estimated_time)
+        edges = self.edges()
+        if depends_on is not None:
+            edges[name] = set(depends_on)
+        if dependents is not None:
+            for deps in edges.values():
+                deps.discard(name)
+            link_dependents(edges, name, dependents)
+        validate(edges)
+        self.apply_edges(edges)
+        if description is not None:
+            task.description = description
+        if priority is not None:
+            task.priority = priority
+        if estimated_time is not None:
+            task.estimated_time = estimated_time
+
+    def remove_task(self, name: str, bridge: bool = True) -> None:
+        """Remove a task; with `bridge`, its dependencies are passed on to its dependents.
+
+        Raises:
+            PlanError: If the task does not exist.
+        """
+        parents = self.require(name).depends_on
+        edges = self.edges()
+        del edges[name]
+        for deps in edges.values():
+            if name in deps:
+                deps.discard(name)
+                if bridge:
+                    deps |= parents
+        del self.tasks[name]
+        self.apply_edges(edges)
+
+    def require(self, name: str) -> Task:
+        """Return the named task, or raise PlanError pointing at topo_get_plan."""
+        if name not in self.tasks:
+            raise PlanError(
+                f"Unknown task '{name}'. Call topo_get_plan to see task names."
+            )
+        return self.tasks[name]
+
     def apply_edges(self, edges: Edges) -> None:
         """Write a validated edge map back onto the tasks."""
         for name, depends_on in edges.items():
@@ -146,10 +206,15 @@ class Project:
 
 
 def link_dependents(edges: Edges, name: str, dependents: Iterable[str]) -> None:
-    """Make every task in `dependents` depend on `name`, in place."""
+    """Make every task in `dependents` depend on `name`, in place.
+
+    A direct edge from one of `name`'s dependencies to the dependent is dropped,
+    because it is now implied through `name` (this is what "insert between" means).
+    """
     for child in dependents:
         if child not in edges:
             raise PlanError(f"Unknown task '{child}'. Add it first with topo_add_task.")
+        edges[child] -= edges[name]
         edges[child].add(name)
 
 

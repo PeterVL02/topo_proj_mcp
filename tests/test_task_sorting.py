@@ -127,3 +127,67 @@ def test_gamma_out_of_range_is_rejected(gamma: float) -> None:
     """γ must be in (0, 1]."""
     with pytest.raises(PlanError, match="gamma"):
         make_diamond().values(gamma)
+
+
+def test_insert_between_drops_the_direct_edge() -> None:
+    """Inserting X between A and B leaves A -> X -> B, without a redundant A -> B."""
+    project = make_diamond()
+    project.add_task(make_task("X", {"A"}), dependents=["B"])
+    assert project.tasks["B"].depends_on == {"X"}
+    assert project.stages() == [["A"], ["C", "X"], ["B"], ["D"]]
+
+
+def test_move_by_replacing_depends_on() -> None:
+    """Rewiring depends_on moves a task to a new place in the order."""
+    project = make_diamond()
+    project.update_task("C", depends_on=["B"])
+    assert project.stages() == [["A"], ["B"], ["C"], ["D"]]
+
+
+def test_move_by_replacing_dependents() -> None:
+    """Passing dependents replaces every task that waits for this one."""
+    project = make_diamond()
+    project.update_task("A", dependents=["B"])
+    assert project.tasks["C"].depends_on == set()
+    assert project.stages() == [["A", "C"], ["B"], ["D"]]
+
+
+def test_move_into_a_cycle_is_rejected_and_project_unchanged() -> None:
+    """A move that closes a cycle raises and keeps the old edges."""
+    project = make_diamond()
+    with pytest.raises(PlanError, match="cycle"):
+        project.update_task("A", depends_on=["D"])
+    assert project.tasks["A"].depends_on == set()
+
+
+def test_update_fields() -> None:
+    """Priority, estimate and description can be changed in place."""
+    project = make_diamond()
+    project.update_task(
+        "B", priority=PriorityLevel.HIGH, estimated_time=4, description="new"
+    )
+    task = project.tasks["B"]
+    assert (task.priority, task.estimated_time, task.description) == (
+        PriorityLevel.HIGH,
+        4,
+        "new",
+    )
+    with pytest.raises(PlanError):
+        project.update_task("B", estimated_time=-1)
+    with pytest.raises(PlanError, match="Unknown task"):
+        project.update_task("missing", description="x")
+
+
+def test_remove_with_bridge_keeps_ordering() -> None:
+    """Removing B connects its parents to its children."""
+    project = make_diamond()
+    project.remove_task("B")
+    assert project.tasks["D"].depends_on == {"A", "C"}
+
+
+def test_remove_without_bridge_drops_edges() -> None:
+    """Without bridging, B's edges simply disappear."""
+    project = make_diamond()
+    project.remove_task("B", bridge=False)
+    assert project.tasks["D"].depends_on == {"C"}
+    assert "B" not in project.tasks
