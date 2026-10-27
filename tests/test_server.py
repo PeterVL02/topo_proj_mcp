@@ -15,6 +15,7 @@ def project_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     path = tmp_path / "project.json"
     monkeypatch.setattr(server, "project", Project())
     monkeypatch.setattr(server, "project_file", path)
+    monkeypatch.setattr(server, "load_error", None)
     return path
 
 
@@ -98,3 +99,43 @@ def test_concurrent_calls_do_not_race(project_file: Path) -> None:
 
     asyncio.run(add_many())
     assert len(Project.load(project_file).tasks) == 20
+
+
+CORRUPT_FILES = {
+    "invalid json": "{not json",
+    "missing key": '{"tasks": [{"name": "a"}]}',
+    "cycle": (
+        '{"tasks": ['
+        '{"name": "a", "description": "", "priority": "low", "estimated_time": 1,'
+        ' "status": "not_started", "depends_on": ["b"], "started_at": null,'
+        ' "completed_at": null, "actual_time": null},'
+        '{"name": "b", "description": "", "priority": "low", "estimated_time": 1,'
+        ' "status": "not_started", "depends_on": ["a"], "started_at": null,'
+        ' "completed_at": null, "actual_time": null}]}'
+    ),
+}
+
+
+@pytest.mark.parametrize("content", CORRUPT_FILES.values(), ids=CORRUPT_FILES.keys())
+def test_corrupt_plan_file_gives_clear_error(
+    monkeypatch: pytest.MonkeyPatch, project_file: Path, content: str
+) -> None:
+    """A broken plan file never crashes the server and is never overwritten."""
+    project_file.write_text(content, encoding="utf-8")
+    loaded, error = server.load_project()
+    assert loaded.tasks == {} and error
+    monkeypatch.setattr(server, "load_error", error)
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    with pytest.raises(ToolError, match="unreadable"):
+        call("topo_add_task", name="x", estimated_time=1)
+    assert project_file.read_text(encoding="utf-8") == content
+
+
+def test_server_recovers_once_the_file_is_fixed(
+    monkeypatch: pytest.MonkeyPatch, project_file: Path
+) -> None:
+    """Deleting or fixing the file lets the next call proceed without a restart."""
+    monkeypatch.setattr(server, "load_error", "JSONDecodeError: bad")
+    assert not project_file.exists()  # the user deleted the broken file
+    assert "No tasks yet" in call("topo_get_plan")

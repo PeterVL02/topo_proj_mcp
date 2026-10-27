@@ -192,7 +192,7 @@ harden the plugin or cut it back.
 ## Task List
 
 ### Phase 6: Make it testable
-- [ ] Task 12: A corrupt plan file gives a clear tool error instead of killing the server
+- [x] Task 12: A corrupt plan file gives a clear tool error instead of killing the server
 - [ ] Task 13: Benchmark harness (headless `claude -p`, three setups, token and trigger metrics), then a baseline run
 
 ### Checkpoint: baseline numbers recorded in `bench/results.md`

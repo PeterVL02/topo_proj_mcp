@@ -149,7 +149,7 @@ the overall ratio of total actual to total estimated time.
 
 # Phases 6–8: Prove the token and rigidity claims
 
-## Task 12: Corrupt plan file gives a clear error
+## Task 12: Corrupt plan file gives a clear error ✅
 
 **Description:** Loading a broken or invalid plan file must not crash the server at import. Start
 with an empty project in memory, keep the broken file untouched, and make every tool return

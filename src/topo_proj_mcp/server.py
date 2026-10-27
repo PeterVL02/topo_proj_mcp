@@ -22,10 +22,19 @@ mcp = MCPServer(
     ),
 )
 project_file = Path(os.environ.get("TOPO_PROJECT_FILE", "project.json"))
-project = Project.load(project_file)
-project_lock = (
-    threading.Lock()
-)  # ponytail: one global lock; fine for one project per server
+
+
+def load_project() -> tuple[Project, str | None]:
+    """Load the plan file; if it is unreadable, return an empty project and the reason."""
+    try:
+        return Project.load(project_file), None
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
+        return Project(), f"{type(error).__name__}: {error}"
+
+
+project, load_error = load_project()
+# ponytail: one global lock; fine for one project per server
+project_lock = threading.Lock()
 
 EDIT = ToolAnnotations(
     read_only_hint=False,
@@ -41,9 +50,18 @@ def using_project() -> Generator[None]:
     """Hold the project lock and turn PlanError into ToolError for the model.
 
     The SDK runs sync tools in worker threads, so parallel calls would otherwise race
-    on the shared project and its save file.
+    on the shared project and its save file. If the plan file was unreadable, it is
+    retried here, and nothing runs (or overwrites it) until it loads.
     """
+    global project, load_error
     with project_lock:
+        if load_error:
+            project, load_error = load_project()
+        if load_error:
+            raise ToolError(
+                f"Plan file {project_file} is unreadable ({load_error}). Fix or delete "
+                "it; no changes are saved until it loads."
+            )
         try:
             yield
         except PlanError as error:
