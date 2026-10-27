@@ -61,6 +61,7 @@ class Project:
     def save(self, path: Path) -> None:
         """Write the project to JSON atomically, so a crash never leaves half a file."""
         data: ProjectJSON = {"tasks": [task.to_json() for task in self.tasks.values()]}
+        path.parent.mkdir(parents=True, exist_ok=True)
         temp = path.with_name(path.name + ".tmp")
         temp.write_text(
             json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"

@@ -308,3 +308,10 @@ def test_time_report_compares_estimates_with_actuals() -> None:
 def test_time_report_without_completed_tasks() -> None:
     """With nothing finished there is nothing to compare yet."""
     assert "No completed tasks yet" in make_diamond().time_report()
+
+
+def test_save_creates_missing_folders(tmp_path: Path) -> None:
+    """The plugin saves to <project>/.claude/, which may not exist yet."""
+    path = tmp_path / ".claude" / "topo-plan.json"
+    make_diamond().save(path)
+    assert Project.load(path).tasks.keys() == {"A", "B", "C", "D"}
