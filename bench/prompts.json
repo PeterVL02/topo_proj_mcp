@@ -1,0 +1,92 @@
+[
+  {
+    "id": "auth",
+    "kind": "plan",
+    "prompt": "We have a Flask app with a SQLite database and server-rendered pages. Add user accounts: sign-up with email confirmation, login/logout, password reset by email, and per-user ownership of the existing 'notes' table so users only see their own notes. Existing notes must be migrated to an 'admin' user. Plan this work before doing anything. Only produce the plan; do not write any code."
+  },
+  {
+    "id": "csv-export",
+    "kind": "plan",
+    "prompt": "Our Django admin needs a CSV export for the Orders model: filters (date range, status), a background job for exports over 10k rows that emails a download link, an audit log entry per export, and permissions so only finance staff can use it. Plan this work before doing anything. Only produce the plan; do not write any code."
+  },
+  {
+    "id": "cli-tool",
+    "kind": "plan",
+    "prompt": "Build a Python CLI called 'tidy' that scans a folder of photos, reads EXIF dates, renames files to YYYY-MM-DD_HHMMSS.ext, moves them into year/month folders, detects duplicates by hash, and has a --dry-run flag, a config file and tests. Plan this work before doing anything. Only produce the plan; do not write any code."
+  },
+  {
+    "id": "migrate-ts",
+    "kind": "plan",
+    "prompt": "Migrate a 40-file JavaScript Express API to TypeScript incrementally: set up tsconfig and the build, add types for the shared models first, convert routes module by module, keep the app deployable after every step, and turn on strict mode at the end. Plan this work before doing anything. Only produce the plan; do not write any code."
+  },
+  {
+    "id": "ml-pipeline",
+    "kind": "plan",
+    "prompt": "Set up an ML pipeline for churn prediction from three CSV exports (customers, payments, support tickets): data validation, joins, a leakage check, feature engineering, a baseline logistic regression, a gradient-boosted model, a time-based train/test split, an evaluation report, and a script that scores new customers weekly. Plan this work before doing anything. Only produce the plan; do not write any code."
+  },
+  {
+    "id": "react-dashboard",
+    "kind": "plan",
+    "prompt": "Add an analytics dashboard page to our React + REST app: three new API endpoints (signups per day, revenue per plan, active users), a chart component, date-range filtering shared by all charts, loading and error states, caching on the server, and end-to-end tests. Plan this work before doing anything. Only produce the plan; do not write any code."
+  },
+  {
+    "id": "ci-setup",
+    "kind": "plan",
+    "prompt": "Our Go monorepo has three services and no CI. Set up GitHub Actions with linting, unit tests per service, a shared integration test job that needs a Postgres container, Docker image builds that only run when a service changed, and deployment to staging on merge to main. Plan this work before doing anything. Only produce the plan; do not write any code."
+  },
+  {
+    "id": "i18n",
+    "kind": "plan",
+    "prompt": "Internationalise a Vue web shop into German and Danish: extract all strings, add a translation library, locale detection and a switcher, localised prices and dates, translated emails, and SEO-friendly locale URLs. Plan this work before doing anything. Only produce the plan; do not write any code."
+  },
+  {
+    "id": "perf",
+    "kind": "plan",
+    "prompt": "Our product search endpoint takes 2-4 seconds. Plan an investigation and fix: add profiling and timing logs, reproduce with a load test, check the SQL query plans, add indexes, introduce a cache with invalidation on product updates, and verify the p95 drops under 300ms. Plan this work before doing anything. Only produce the plan; do not write any code."
+  },
+  {
+    "id": "mobile-offline",
+    "kind": "plan",
+    "prompt": "Make our React Native to-do app work offline: a local database, a sync queue for changes made offline, conflict resolution when the same item changed on two devices, a sync status indicator, background sync when the connection returns, and tests for the conflict cases. Plan this work before doing anything. Only produce the plan; do not write any code."
+  },
+  {
+    "id": "trivial-regex",
+    "kind": "trivial",
+    "prompt": "In one sentence: what does the regex ^\\d{3}-\\d{4}$ match?"
+  },
+  {
+    "id": "trivial-temp",
+    "kind": "trivial",
+    "prompt": "Convert 72 degrees Fahrenheit to Celsius. Just the number."
+  },
+  {
+    "id": "trivial-reverse",
+    "kind": "trivial",
+    "prompt": "Give me a Python one-liner that reverses a string s."
+  },
+  {
+    "id": "trivial-typo",
+    "kind": "trivial",
+    "prompt": "Fix the spelling in this sentence and reply with only the fixed sentence: 'We will recieve the pacakge tomorow.'"
+  },
+  {
+    "id": "trivial-tuple",
+    "kind": "trivial",
+    "prompt": "In two sentences: what is the difference between a list and a tuple in Python?"
+  },
+  {
+    "id": "execute-files",
+    "kind": "execute",
+    "prompt": "Create eight small text files in the current folder. Each file contains a single line with its own name. A file may only be created after every file it depends on already exists. release.txt depends on tests.txt and docs.txt. docs.txt depends on api.txt and auth.txt. tests.txt depends on api.txt. api.txt depends on models.txt and auth.txt. models.txt depends on schema.txt. auth.txt depends on config.txt. schema.txt depends on config.txt. config.txt depends on nothing. Plan the order first, then create the files.",
+    "dag": {
+      "config.txt": [],
+      "schema.txt": ["config.txt"],
+      "auth.txt": ["config.txt"],
+      "models.txt": ["schema.txt"],
+      "api.txt": ["models.txt", "auth.txt"],
+      "tests.txt": ["api.txt"],
+      "docs.txt": ["api.txt", "auth.txt"],
+      "release.txt": ["tests.txt", "docs.txt"]
+    }
+  }
+]
