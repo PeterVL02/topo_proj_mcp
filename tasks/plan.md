@@ -193,14 +193,14 @@ harden the plugin or cut it back.
 
 ### Phase 6: Make it testable
 - [x] Task 12: A corrupt plan file gives a clear tool error instead of killing the server
-- [ ] Task 13: Benchmark harness (headless `claude -p`, three setups, token and trigger metrics), then a baseline run
+- [x] Task 13: Benchmark harness (headless `claude -p`, three setups, token and trigger metrics), then a baseline run
 
 ### Checkpoint: baseline numbers recorded in `bench/results.md`
 
 ### Phase 7: Fix the token leak
 - [x] Task 14: Edits return a short confirmation instead of the full plan
 - [x] Task 15: `topo_add_tasks` adds a whole plan in one atomic call; the skill prefers it
-- [ ] Task 16: Re-run the benchmark and compare against the baseline
+- [x] Task 16: Re-run the benchmark and compare against the baseline
 
 ### Checkpoint: decide with the human (Phase 8)
 - **Pass** (all of): building the plan costs ≤ 50% of the tokens the prose skill uses for the same spec;
@@ -224,3 +224,29 @@ harden the plugin or cut it back.
 
 1. ~~Model and runs~~: decided, Sonnet 5.5, 10 planning + 5 trivial prompts × 2 runs × 3 setups.
 2. ~~Commit the plan file?~~: decided, commit `.claude/topo-plan.json` (git gives history and undo).
+
+## Results (2026-10-28, Sonnet 5.5, 2 runs per prompt; raw tables in `bench/results.md`)
+
+Median per planning prompt. "Forced" = skill invoked by slash command, i.e. the cost of the approach when it runs.
+
+| setup | $ | input tok | output tok | turns |
+|---|---|---|---|---|
+| none | 0.066 | 45.7k | 2.8k | 2 |
+| prose-forced | 0.179 | 90.1k | 8.6k | 5 |
+| topo-forced, baseline | 0.128 | 247.8k | 3.0k | 13 |
+| **topo-forced, after Tasks 14–15** | **0.077** | **79.0k** | **1.8k** | **3** |
+| topo unprompted, after | 0.092 | 103.9k | 2.7k | 5.5 |
+
+Against the pass bar:
+- **Plan-building cost ≤ 50% of the prose skill: PASS on cost (43%: $0.077 vs $0.179) and output
+  tokens (21%).** Raw input tokens only drop to 88% (79k vs 90k), because most of that input is
+  fixed, cached context that every turn re-reads. On top of the no-planning baseline, topo adds
+  $0.011 per plan and prose adds $0.112.
+- **Triggering: PASS.** Planning prompts 20/20 (prose skill: 4/20); trivial prompts 0/10.
+- **Order violations: PASS, but it doesn't discriminate.** All setups scored 0, including no planning aid at all.
+  The 8-file test was too easy to show any benefit from rigidity.
+
+Caveats: plan quality was not scored. Prose plans carry acceptance criteria and verification
+steps, which topo plans don't, so part of the output-token gap is content rather than overhead.
+The execution loop is now the expensive part: the forced execute run took 28 turns, because the
+skill asks for `in_progress` and then `completed` for every task.

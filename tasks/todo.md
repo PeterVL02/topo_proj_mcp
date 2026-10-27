@@ -161,7 +161,7 @@ with an empty project in memory, keep the broken file untouched, and make every 
 
 **Verification:** pytest (in-process tool calls with a corrupt fixture file) · **Dependencies:** None · **Files:** `server.py`, `tests/test_server.py` · **Scope:** XS
 
-## Task 13: Benchmark harness and baseline
+## Task 13: Benchmark harness and baseline ✅
 
 **Description:** Add `bench/run.py`, which runs `claude -p --output-format json` for each prompt in
 `bench/prompts.json` under three setups:
@@ -209,7 +209,7 @@ a single batch call.
 
 **Verification:** pytest · **Dependencies:** 14 · **Files:** `task_sorting.py`, `server.py`, `SKILL.md`, tests · **Scope:** S
 
-## Task 16: Re-run the benchmark
+## Task 16: Re-run the benchmark ✅
 
 **Acceptance criteria:**
 - [ ] `bench/results.md` shows the baseline, the after-fix numbers and the prose skill side by side, judged against the pass bar in plan.md
