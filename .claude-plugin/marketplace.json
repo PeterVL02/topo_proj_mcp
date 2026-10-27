@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "topo-planner",
+  "description": "Topological, time-discounted task planning for Claude Code.",
+  "owner": {
+    "name": "PeterVL02",
+    "url": "https://github.com/PeterVL02"
+  },
+  "plugins": [
+    {
+      "name": "topo-planner",
+      "source": "./",
+      "description": "Plan work as a dependency graph before doing it, then work through it by time-discounted value.",
+      "category": "productivity"
+    }
+  ]
+}

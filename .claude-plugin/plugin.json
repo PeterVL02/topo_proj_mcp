@@ -1,0 +1,21 @@
+{
+  "name": "topo-planner",
+  "displayName": "Topo Planner",
+  "version": "0.1.0",
+  "description": "Plan work as a dependency graph before doing it: topologically sorted stages, ranked by RL-style time-discounted value, with progress and estimate-vs-actual tracking.",
+  "author": {
+    "name": "PeterVL02",
+    "url": "https://github.com/PeterVL02"
+  },
+  "repository": "https://github.com/PeterVL02/topo_proj_mcp",
+  "keywords": ["planning", "tasks", "dependencies", "topological-sort", "mcp"],
+  "mcpServers": {
+    "topo": {
+      "command": "uv",
+      "args": ["--directory", "${CLAUDE_PLUGIN_ROOT}", "run", "--quiet", "topo-proj-mcp"],
+      "env": {
+        "TOPO_PROJECT_FILE": "${CLAUDE_PROJECT_DIR}/.claude/topo-plan.json"
+      }
+    }
+  }
+}

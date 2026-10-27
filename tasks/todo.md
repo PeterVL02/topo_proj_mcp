@@ -128,7 +128,7 @@ the overall ratio of total actual to total estimated time.
 **Acceptance:** saving to `<dir>/.claude/topo-plan.json` works when `.claude/` doesn't exist.
 **Verification:** pytest · **Files:** `task_sorting.py`, tests · **Scope:** XS
 
-## Task 10: Plugin manifest, marketplace and skill
+## Task 10: Plugin manifest, marketplace and skill ✅
 
 **Acceptance:**
 - [ ] `.claude-plugin/plugin.json` declares the `topo` MCP server inline, with a per-project `TOPO_PROJECT_FILE`
