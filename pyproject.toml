@@ -1,0 +1,25 @@
+[project]
+name = "topo-proj-mcp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "PeterVL02", email = "p.vesterenglarsen@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "mcp>=2.3.0",
+]
+
+[project.scripts]
+topo-proj-mcp = "topo_proj_mcp:main"
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.3",
+]
