@@ -105,7 +105,7 @@ simulation that picks the best `V/est` among ready tasks that still fit the budg
 
 **Verification:** pytest · **Dependencies:** 5 · **Files:** `task_sorting.py`, `server.py`, tests · **Scope:** S
 
-## Task 8: Time report
+## Task 8: Time report ✅
 
 **Description:** Add the tool `time_report()`: for each completed task, the estimate, the actual
 time (`actual_hours`, or the wall-clock time between start and completion) and their ratio, plus

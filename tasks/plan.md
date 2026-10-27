@@ -109,7 +109,7 @@ The editing tools are:
 
 ### Phase 4: Time
 - [x] Task 7: Earliest finish (eta) and budgeted `next_tasks`
-- [ ] Task 8: `time_report`, estimate vs actual
+- [x] Task 8: `time_report`, estimate vs actual
 
 ### Checkpoint: Complete
 

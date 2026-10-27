@@ -46,7 +46,7 @@ def test_dependents_are_stored_as_edges_on_the_dependent() -> None:
     project.add_task(make_task("B"))
     project.add_task(make_task("A"), dependents=["B"])
     assert project.tasks["B"].depends_on == {"A"}
-    assert project.dependents_of("A") == {"B"}
+    assert project.children()["A"] == {"B"}
 
 
 def test_cycle_is_rejected_and_project_unchanged() -> None:
@@ -289,3 +289,22 @@ def test_non_positive_budget_is_rejected() -> None:
     """A budget must be a positive number of hours."""
     with pytest.raises(PlanError, match="budget"):
         make_diamond().next_tasks(budget=0)
+
+
+def test_time_report_compares_estimates_with_actuals() -> None:
+    """Per-task ratios, an overall ratio and a bias-adjusted remaining estimate."""
+    project = make_diamond()
+    project.update_task("A", estimated_time=2)
+    project.set_status("A", Status.COMPLETED, actual_hours=3)
+    project.set_status("B", Status.COMPLETED, actual_hours=0.5)
+    project.set_status("C", Status.COMPLETED)
+    report = project.time_report()
+    assert "A  est 2h  actual 3h  ×1.50" in report
+    assert "C  est 1h  no timing data" in report
+    assert "3.5h actual vs 3h estimated (×1.17)" in report  # (3 + 0.5) / (2 + 1)
+    assert "1h estimated, ~1.2h at that rate" in report
+
+
+def test_time_report_without_completed_tasks() -> None:
+    """With nothing finished there is nothing to compare yet."""
+    assert "No completed tasks yet" in make_diamond().time_report()

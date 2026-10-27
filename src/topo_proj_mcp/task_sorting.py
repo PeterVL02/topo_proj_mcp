@@ -79,10 +79,6 @@ class Project:
                 children[dep].add(name)
         return children
 
-    def dependents_of(self, name: str) -> set[str]:
-        """Return the names of tasks that depend directly on `name`."""
-        return self.children()[name]
-
     def values(self, gamma: float = DEFAULT_GAMMA) -> dict[str, float]:
         """Return each task's time-discounted value.
 
@@ -303,6 +299,44 @@ class Project:
         described = self.describe_all(self.values(gamma))
         lines = [header]
         lines.extend(f"  {i}. {described[n]}" for i, n in enumerate(names, start=1))
+        return "\n".join(lines)
+
+    def time_report(self) -> str:
+        """Compare estimated with actual hours for completed tasks.
+
+        The overall ratio (total actual / total estimated, over timed tasks) is your
+        estimation bias; it is applied to the remaining work as a rough forecast.
+        """
+        completed = [t for t in self.tasks.values() if t.status is Status.COMPLETED]
+        if not completed:
+            return "No completed tasks yet. Finish one with topo_set_status."
+        lines = ["Estimate vs actual (completed tasks):"]
+        for task in completed:
+            line = f"  {task.name}  est {task.estimated_time:g}h  "
+            if task.actual_time is None:
+                line += "no timing data (never started and no actual_hours given)"
+            else:
+                ratio = task.actual_time / task.estimated_time
+                line += f"actual {task.actual_time:.3g}h  ×{ratio:.2f}"
+            lines.append(line)
+        timed = [t for t in completed if t.actual_time is not None]
+        if not timed:
+            return "\n".join(lines)
+        actual = sum(t.actual_time or 0.0 for t in timed)
+        estimated = sum(t.estimated_time for t in timed)
+        ratio = actual / estimated
+        remaining = sum(
+            t.estimated_time
+            for t in self.tasks.values()
+            if t.status is not Status.COMPLETED
+        )
+        lines.append(
+            f"Overall: {actual:.3g}h actual vs {estimated:.3g}h estimated (×{ratio:.2f}) "
+            f"over {len(timed)} timed task(s)."
+        )
+        lines.append(
+            f"Remaining: {remaining:.3g}h estimated, ~{remaining * ratio:.2g}h at that rate."
+        )
         return "\n".join(lines)
 
     def require(self, name: str) -> Task:

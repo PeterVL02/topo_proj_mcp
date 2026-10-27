@@ -73,3 +73,28 @@ def test_next_tasks_with_budget() -> None:
     call("topo_add_task", name="b", estimated_time=3, depends_on=["a"])
     text = call("topo_next_tasks", budget=2)
     assert "1 of 2h" in text and "] a " in text and "] b " not in text
+
+
+def test_time_report_tool() -> None:
+    """The report is reachable through MCP."""
+    call("topo_add_task", name="a", estimated_time=2)
+    call("topo_set_status", name="a", status="completed", actual_hours=1)
+    assert "×0.50" in call("topo_time_report")
+
+
+def test_concurrent_calls_do_not_race(project_file: Path) -> None:
+    """The SDK runs tools in threads; parallel edits must all land and be saved."""
+
+    async def add_many() -> None:
+        """Fire 20 add_task calls at once."""
+        await asyncio.gather(
+            *(
+                server.mcp.call_tool(
+                    "topo_add_task", {"name": f"t{i}", "estimated_time": 1}
+                )
+                for i in range(20)
+            )
+        )
+
+    asyncio.run(add_many())
+    assert len(Project.load(project_file).tasks) == 20

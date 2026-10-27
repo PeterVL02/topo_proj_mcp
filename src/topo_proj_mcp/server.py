@@ -1,7 +1,8 @@
 """MCP server exposing the topological task planner as tools."""
 
 import os
-from collections.abc import Iterator
+import threading
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -22,6 +23,9 @@ mcp = MCPServer(
 )
 project_file = Path(os.environ.get("TOPO_PROJECT_FILE", "project.json"))
 project = Project.load(project_file)
+project_lock = (
+    threading.Lock()
+)  # ponytail: one global lock; fine for one project per server
 
 EDIT = ToolAnnotations(
     read_only_hint=False,
@@ -33,12 +37,17 @@ READ = ToolAnnotations(read_only_hint=True, open_world_hint=False)
 
 
 @contextmanager
-def plan_errors() -> Iterator[None]:
-    """Turn PlanError into ToolError so the model sees the message instead of a crash."""
-    try:
-        yield
-    except PlanError as error:
-        raise ToolError(str(error)) from error
+def using_project() -> Generator[None]:
+    """Hold the project lock and turn PlanError into ToolError for the model.
+
+    The SDK runs sync tools in worker threads, so parallel calls would otherwise race
+    on the shared project and its save file.
+    """
+    with project_lock:
+        try:
+            yield
+        except PlanError as error:
+            raise ToolError(str(error)) from error
 
 
 def save_and_render() -> str:
@@ -74,9 +83,9 @@ def topo_add_task(
         estimated_time=estimated_time,
         depends_on=set(depends_on or ()),
     )
-    with plan_errors():
+    with using_project():
         project.add_task(task, dependents or ())
-    return save_and_render()
+        return save_and_render()
 
 
 @mcp.tool(annotations=EDIT)
@@ -101,7 +110,7 @@ def topo_update_task(
         depends_on: New full list of tasks this one waits for.
         dependents: New full list of tasks that wait for this one.
     """
-    with plan_errors():
+    with using_project():
         project.update_task(
             name,
             description=description,
@@ -110,7 +119,7 @@ def topo_update_task(
             depends_on=depends_on,
             dependents=dependents,
         )
-    return save_and_render()
+        return save_and_render()
 
 
 @mcp.tool(
@@ -129,9 +138,9 @@ def topo_remove_task(name: str, bridge: bool = True) -> str:
         bridge: If true (default), tasks that waited for it now wait for its dependencies
             instead, so the ordering is preserved. If false, its edges are just dropped.
     """
-    with plan_errors():
+    with using_project():
         project.remove_task(name, bridge)
-    return save_and_render()
+        return save_and_render()
 
 
 @mcp.tool(
@@ -156,10 +165,10 @@ def topo_set_status(
         actual_hours: Hours actually spent, only with completed. Defaults to the time
             between in_progress and completed, which includes any idle time.
     """
-    with plan_errors():
+    with using_project():
         project.set_status(name, status, actual_hours)
-    project.save(project_file)
-    return f"{name}: {status}.\n\n{project.render_next()}"
+        project.save(project_file)
+        return f"{name}: {status}.\n\n{project.render_next()}"
 
 
 @mcp.tool(annotations=READ)
@@ -173,7 +182,7 @@ def topo_next_tasks(gamma: float = DEFAULT_GAMMA, budget: float | None = None) -
         gamma: Discount per average task duration, in (0, 1]. Lower favours quick wins.
         budget: Hours available. Omit to list everything that is ready now.
     """
-    with plan_errors():
+    with using_project():
         return project.render_next(gamma, budget)
 
 
@@ -191,5 +200,16 @@ def topo_get_plan(gamma: float = DEFAULT_GAMMA) -> str:
     Args:
         gamma: Discount per average task duration, in (0, 1]. Lower favours quick wins.
     """
-    with plan_errors():
+    with using_project():
         return project.render(gamma)
+
+
+@mcp.tool(annotations=READ)
+def topo_time_report() -> str:
+    """Compare estimated and actual hours for completed tasks.
+
+    Shows each task's actual/estimate ratio, the overall ratio (your estimation bias)
+    and the remaining estimated work scaled by that ratio.
+    """
+    with using_project():
+        return project.time_report()
