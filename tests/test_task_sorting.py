@@ -1,5 +1,7 @@
 """Tests for the Project graph: building, sorting, scoring, timing and persistence."""
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from topo_proj_mcp.models import PriorityLevel, Status, Task
@@ -191,3 +193,46 @@ def test_remove_without_bridge_drops_edges() -> None:
     project.remove_task("B", bridge=False)
     assert project.tasks["D"].depends_on == {"C"}
     assert "B" not in project.tasks
+
+
+def test_walk_diamond_with_next_tasks() -> None:
+    """Completing tasks unlocks their dependents, and nothing starts early."""
+    project = make_diamond()
+    assert project.next_tasks() == ["A"]
+    with pytest.raises(PlanError, match="waiting on A"):
+        project.set_status("B", Status.IN_PROGRESS)
+    project.set_status("A", Status.COMPLETED)
+    assert sorted(project.next_tasks()) == ["B", "C"]
+    project.set_status("B", Status.COMPLETED)
+    project.set_status("C", Status.COMPLETED)
+    assert project.next_tasks() == ["D"]
+    project.set_status("D", Status.COMPLETED)
+    assert project.next_tasks() == []
+
+
+def test_actual_time_from_timestamps_or_override() -> None:
+    """Actual hours come from start/finish times unless given explicitly."""
+    start = datetime(2026, 1, 1, 9, tzinfo=UTC)
+    project = make_diamond()
+    project.set_status("A", Status.IN_PROGRESS, now=start)
+    project.set_status("A", Status.COMPLETED, now=start + timedelta(hours=2))
+    assert project.tasks["A"].actual_time == pytest.approx(2)
+
+    project.set_status("B", Status.COMPLETED, actual_hours=1.5)
+    assert project.tasks["B"].actual_time == 1.5
+
+    project.set_status("C", Status.COMPLETED)
+    assert project.tasks["C"].actual_time is None
+
+    project.set_status("A", Status.NOT_STARTED)
+    task = project.tasks["A"]
+    assert (task.started_at, task.completed_at, task.actual_time) == (None, None, None)
+
+
+@pytest.mark.parametrize(
+    ("status", "hours"), [(Status.IN_PROGRESS, 1.0), (Status.COMPLETED, 0.0)]
+)
+def test_invalid_actual_hours_rejected(status: Status, hours: float) -> None:
+    """actual_hours is only for completion and must be positive."""
+    with pytest.raises(PlanError, match="actual_hours"):
+        make_diamond().set_status("A", status, actual_hours=hours)

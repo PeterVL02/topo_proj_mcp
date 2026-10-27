@@ -102,7 +102,7 @@ The editing tools are:
 ### Checkpoint: A model can build and reshape a plan
 
 ### Phase 3: Execution
-- [ ] Task 5: Progress tracking with timestamps and `next_tasks`
+- [x] Task 5: Progress tracking with timestamps and `next_tasks`
 - [ ] Task 6: JSON persistence
 
 ### Checkpoint: Plans survive restarts, and the full flow works

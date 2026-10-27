@@ -7,7 +7,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import ToolAnnotations
 
-from topo_proj_mcp.models import PriorityLevel, Task
+from topo_proj_mcp.models import PriorityLevel, Status, Task
 from topo_proj_mcp.task_sorting import DEFAULT_GAMMA, PlanError, Project
 
 mcp = MCPServer(
@@ -123,6 +123,44 @@ def topo_remove_task(name: str, bridge: bool = True) -> str:
     with plan_errors():
         project.remove_task(name, bridge)
     return project.render()
+
+
+@mcp.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
+def topo_set_status(
+    name: str, status: Status, actual_hours: float | None = None
+) -> str:
+    """Mark a task not_started, in_progress or completed, and return what is ready next.
+
+    A task can only be started or completed once everything it depends on is completed.
+    Start and completion times are recorded to compare actual time with the estimate.
+
+    Args:
+        name: The task to update.
+        status: not_started, in_progress or completed.
+        actual_hours: Hours actually spent, only with completed. Defaults to the time
+            between in_progress and completed, which includes any idle time.
+    """
+    with plan_errors():
+        project.set_status(name, status, actual_hours)
+    return f"{name}: {status}.\n\n{project.render_next()}"
+
+
+@mcp.tool(annotations=READ)
+def topo_next_tasks(gamma: float = DEFAULT_GAMMA) -> str:
+    """Return the tasks that can be worked on now, highest value first.
+
+    Args:
+        gamma: Discount per average task duration, in (0, 1]. Lower favours quick wins.
+    """
+    with plan_errors():
+        return project.render_next(gamma)
 
 
 @mcp.tool(annotations=READ)

@@ -66,7 +66,7 @@ and `remove_task(name, bridge=True)`.
 - [ ] Manual: have Claude plan a small real project through the tools, then reshape it
 - [ ] Review with human
 
-## Task 5: Progress tracking
+## Task 5: Progress tracking ✅
 
 **Description:** Add the tool `update_status(name, status, actual_hours=None)`. It sets
 `started_at`/`completed_at` (UTC) and logs the transition to stderr. Add

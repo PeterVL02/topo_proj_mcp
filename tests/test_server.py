@@ -46,3 +46,12 @@ def test_move_and_remove_through_tools() -> None:
     assert "b  HIGH" in plan and "← a" in plan
     plan = call("topo_remove_task", name="a")
     assert "a  " not in plan and "Stage 2" not in plan
+
+
+def test_set_status_shows_what_is_next() -> None:
+    """Finishing a task reports the newly unlocked work."""
+    call("topo_add_task", name="a", estimated_time=1)
+    call("topo_add_task", name="b", estimated_time=1, depends_on=["a"])
+    assert "] b " not in call("topo_next_tasks")
+    text = call("topo_set_status", name="a", status="completed")
+    assert "Ready now" in text and "] b " in text

@@ -1,6 +1,7 @@
 """Module for defining data structures and models."""
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 
 
@@ -31,6 +32,9 @@ class Task:
     estimated_time: float
     status: Status = Status.NOT_STARTED
     depends_on: set[str] = field(default_factory=set)
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    actual_time: float | None = None
 
     @property
     def base_value(self) -> float:

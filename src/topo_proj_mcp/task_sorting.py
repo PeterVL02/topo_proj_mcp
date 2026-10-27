@@ -1,6 +1,8 @@
 """Module for the task dependency graph: validation, topological stages and rendering."""
 
+import logging
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from graphlib import CycleError, TopologicalSorter
 from statistics import mean
 
@@ -10,6 +12,8 @@ type Edges = dict[str, set[str]]
 """Maps each task name to the names it depends on."""
 
 DEFAULT_GAMMA = 0.9
+
+logger = logging.getLogger(__name__)
 
 STATUS_MARKERS: dict[Status, str] = {
     Status.NOT_STARTED: "[ ]",
@@ -147,6 +151,82 @@ class Project:
                     deps |= parents
         del self.tasks[name]
         self.apply_edges(edges)
+
+    def set_status(
+        self,
+        name: str,
+        status: Status,
+        actual_hours: float | None = None,
+        now: datetime | None = None,
+    ) -> None:
+        """Change a task's status and record when it started and finished.
+
+        On completion, actual time is `actual_hours` if given, otherwise the hours
+        between start and completion (None if the task was never started).
+
+        Raises:
+            PlanError: If the task is unknown, its dependencies are not all completed
+                (when starting or completing it), or `actual_hours` is invalid.
+        """
+        task = self.require(name)
+        if actual_hours is not None and (
+            status is not Status.COMPLETED or actual_hours <= 0
+        ):
+            raise PlanError(
+                "actual_hours must be > 0 and is only allowed with 'completed'."
+            )
+        waiting = sorted(
+            d for d in task.depends_on if self.tasks[d].status is not Status.COMPLETED
+        )
+        if status is not Status.NOT_STARTED and waiting:
+            raise PlanError(
+                f"'{name}' is still waiting on {', '.join(waiting)}. Complete those first, "
+                "or move the task with topo_update_task."
+            )
+        now = now or datetime.now(UTC)
+        logger.info("%s: %s -> %s", name, task.status, status)
+        task.status = status
+        match status:
+            case Status.NOT_STARTED:
+                task.started_at = task.completed_at = task.actual_time = None
+            case Status.IN_PROGRESS:
+                task.started_at = task.started_at or now
+                task.completed_at = task.actual_time = None
+            case Status.COMPLETED:
+                task.completed_at = now
+                if actual_hours is not None:
+                    task.actual_time = actual_hours
+                elif task.started_at is not None:
+                    task.actual_time = (now - task.started_at).total_seconds() / 3600
+                else:
+                    task.actual_time = None
+
+    def next_tasks(self, gamma: float = DEFAULT_GAMMA) -> list[str]:
+        """Return unfinished tasks whose dependencies are all completed, best value first."""
+        values = self.values(gamma)
+        ready = [
+            name
+            for name, task in self.tasks.items()
+            if task.status is not Status.COMPLETED
+            and all(self.tasks[d].status is Status.COMPLETED for d in task.depends_on)
+        ]
+        return sorted(ready, key=lambda n: (-values[n], n))
+
+    def render_next(self, gamma: float = DEFAULT_GAMMA) -> str:
+        """Return the ready tasks as text, best value first."""
+        names = self.next_tasks(gamma)
+        if not self.tasks:
+            return "No tasks yet. Add one with topo_add_task."
+        if not names:  # some unfinished task is always ready, so this means all done
+            return "All tasks are done."
+        values = self.values(gamma)
+        children = self.children()
+        lines = ["Ready now (best value first):"]
+        lines.extend(
+            f"  {i}. {self.describe(n, values[n], children[n])}"
+            for i, n in enumerate(names, start=1)
+        )
+        return "\n".join(lines)
 
     def require(self, name: str) -> Task:
         """Return the named task, or raise PlanError pointing at topo_get_plan."""
