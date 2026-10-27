@@ -123,7 +123,7 @@ the overall ratio of total actual to total estimated time.
 
 # Phase 5: Claude Code plugin
 
-## Task 9: save() creates missing parent folders
+## Task 9: save() creates missing parent folders ✅
 
 **Acceptance:** saving to `<dir>/.claude/topo-plan.json` works when `.claude/` doesn't exist.
 **Verification:** pytest · **Files:** `task_sorting.py`, tests · **Scope:** XS

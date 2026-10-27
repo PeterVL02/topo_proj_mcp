@@ -152,7 +152,7 @@ Claude when and how to plan with it. It can be installed from this repo with
 
 ## Task List
 
-- [ ] Task 9: `save()` creates missing parent folders
+- [x] Task 9: `save()` creates missing parent folders
 - [ ] Task 10: Plugin manifest, marketplace and `topo-plan` skill, with a skill/tool sync test
 - [ ] Task 11: Validate the plugin, run a headless end-to-end check, document the install in the README
 
