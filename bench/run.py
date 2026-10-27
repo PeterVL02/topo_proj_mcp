@@ -16,6 +16,7 @@ import shutil
 import statistics
 import subprocess
 import tempfile
+import threading
 import time
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
@@ -40,6 +41,9 @@ FORCE_COMMANDS: dict[str, str] = {
 PROSE_PLAN_FILE = re.compile(r"(^|/)tasks/(plan|todo)\.md$")
 # A task line in todo.md: "## Task 3: x", "- [ ] **Task 3: x**" or "- [x] Task 3: x".
 TASK_LINE = re.compile(r"^(?:- \[[ xX]\]\s*|#+\s*)\**Task \d+")
+RATE_LIMIT = re.compile(
+    r"hit your (session|usage|weekly) limit|usage limit reached", re.IGNORECASE
+)
 
 type Arm = Literal["none", "prose", "topo", "prose-forced", "topo-forced"]
 type BaseArm = Literal["none", "prose", "topo"]
@@ -312,6 +316,28 @@ def run_one(
     return record
 
 
+def is_rate_limited(error: str | None) -> bool:
+    """Return whether a run failed because the account hit its usage limit."""
+    return bool(error) and bool(RATE_LIMIT.search(error or ""))
+
+
+def run_key(record: RunRecord) -> tuple[str, str, int]:
+    """Identify a run by setup, prompt and repetition."""
+    return (record["arm"], record["prompt_id"], record["run"])
+
+
+def finished_keys(records: list[RunRecord]) -> set[tuple[str, str, int]]:
+    """Return the runs that need no retry: everything except rate-limited ones."""
+    return {run_key(r) for r in records if not is_rate_limited(r["error"])}
+
+
+def merge_records(existing: list[RunRecord], new: list[RunRecord]) -> list[RunRecord]:
+    """Combine earlier and new results; rate-limited runs are dropped so they rerun."""
+    merged = {run_key(r): r for r in existing}
+    merged.update((run_key(r), r) for r in new)
+    return [r for r in merged.values() if not is_rate_limited(r["error"])]
+
+
 def write_results_md() -> None:
     """Regenerate bench/results.md from every saved results file."""
     sections = [
@@ -348,35 +374,48 @@ def main() -> None:
     raw_dir = BENCH_DIR / "raw" / args.label
     raw_dir.mkdir(parents=True, exist_ok=True)
 
+    results_file = BENCH_DIR / "results" / f"{args.label}.json"
+    existing: list[RunRecord] = (
+        json.loads(results_file.read_text(encoding="utf-8"))
+        if results_file.exists()
+        else []
+    )
+    done = finished_keys(existing)
+    stop = threading.Event()
+
     with tempfile.TemporaryDirectory() as scratch:
         plugin_dirs = {
             "prose": build_prose_plugin(prose_skill, Path(scratch)),
             "topo": args.topo_plugin.resolve(),
         }
+
+        def run_job(job: tuple[Arm, Prompt, int]) -> RunRecord | None:
+            """Run one job unless a usage limit has already stopped the benchmark."""
+            if stop.is_set():
+                return None
+            record = run_one(*job, args.model, plugin_dirs, raw_dir, args.timeout)
+            if is_rate_limited(record["error"]):
+                stop.set()
+            return record
+
         jobs = [
             (a, p, r)
             for r in range(1, args.runs + 1)
             for p in prompts
             for a in arms
-            if applies(a, p["kind"])
+            if applies(a, p["kind"]) and (a, p["id"], r) not in done
         ]
+        print(f"{len(jobs)} runs to do ({len(done)} already recorded)", flush=True)
         with ThreadPoolExecutor(args.workers) as pool:
-            records = list(
-                pool.map(
-                    lambda job: run_one(
-                        *job, args.model, plugin_dirs, raw_dir, args.timeout
-                    ),
-                    jobs,
-                )
-            )
+            new = [r for r in pool.map(run_job, jobs) if r is not None]
 
-    results_dir = BENCH_DIR / "results"
-    results_dir.mkdir(exist_ok=True)
-    (results_dir / f"{args.label}.json").write_text(
-        json.dumps(records, indent=1), encoding="utf-8"
-    )
+    records = merge_records(existing, new)
+    results_file.parent.mkdir(exist_ok=True)
+    results_file.write_text(json.dumps(records, indent=1), encoding="utf-8")
     write_results_md()
     print(summarize(records))
+    if stop.is_set():
+        print("Stopped early: usage limit reached. Re-run the same command to resume.")
 
 
 if __name__ == "__main__":

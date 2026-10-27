@@ -175,3 +175,40 @@ def test_count_plan_tasks_accepts_checklist_format(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert bench.count_plan_tasks("prose", tmp_path) == 2
+
+
+def make_record(
+    arm: str, prompt_id: str, error: str | None = None
+) -> dict[str, object]:
+    """Build a minimal run record."""
+    return {"arm": arm, "prompt_id": prompt_id, "run": 1, "error": error}
+
+
+LIMIT = "You've hit your session limit · resets 7:50pm (Europe/Copenhagen)"
+
+
+def test_rate_limit_is_detected() -> None:
+    """Usage-limit failures are told apart from other errors."""
+    assert bench.is_rate_limited(LIMIT)
+    assert not bench.is_rate_limited("no result line (crash or timeout)")
+    assert not bench.is_rate_limited(None)
+
+
+def test_merge_keeps_finished_runs_and_replaces_rate_limited_ones() -> None:
+    """A resumed run keeps earlier results and fills in the rate-limited gaps."""
+    existing = [make_record("topo", "a"), make_record("topo", "b", LIMIT)]
+    new = [make_record("topo", "b")]
+    merged = bench.merge_records(existing, new)
+    assert [(r["prompt_id"], r["error"]) for r in merged] == [("a", None), ("b", None)]
+
+
+def test_merge_drops_rate_limited_runs_so_they_are_retried() -> None:
+    """Rate-limited records are never saved as results."""
+    merged = bench.merge_records([], [make_record("topo", "a", LIMIT)])
+    assert merged == []
+
+
+def test_finished_keys_skip_only_kept_runs() -> None:
+    """Jobs already recorded (other than rate-limited ones) are not run again."""
+    existing = [make_record("topo", "a"), make_record("none", "a", "crash")]
+    assert bench.finished_keys(existing) == {("topo", "a", 1), ("none", "a", 1)}
