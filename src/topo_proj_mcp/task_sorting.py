@@ -2,11 +2,14 @@
 
 from collections.abc import Iterable
 from graphlib import CycleError, TopologicalSorter
+from statistics import mean
 
 from topo_proj_mcp.models import Status, Task
 
 type Edges = dict[str, set[str]]
 """Maps each task name to the names it depends on."""
+
+DEFAULT_GAMMA = 0.9
 
 STATUS_MARKERS: dict[Status, str] = {
     Status.NOT_STARTED: "[ ]",
@@ -33,9 +36,44 @@ class Project:
         """Return a copy of the graph that can be edited without touching the tasks."""
         return {name: set(task.depends_on) for name, task in self.tasks.items()}
 
+    def children(self) -> Edges:
+        """Return the reverse graph: each task name mapped to the tasks that depend on it."""
+        children: Edges = {name: set() for name in self.tasks}
+        for name, task in self.tasks.items():
+            for dep in task.depends_on:
+                children[dep].add(name)
+        return children
+
     def dependents_of(self, name: str) -> set[str]:
         """Return the names of tasks that depend directly on `name`."""
-        return {other for other, task in self.tasks.items() if name in task.depends_on}
+        return self.children()[name]
+
+    def values(self, gamma: float = DEFAULT_GAMMA) -> dict[str, float]:
+        """Return each task's time-discounted value.
+
+        V(t) = γ^(est(t)/τ) · (base(t) + max V(dependents)), where τ is the mean estimate,
+        so γ is the discount per average-sized task. Completed tasks are worth 0.
+
+        Raises:
+            PlanError: If gamma is not in (0, 1].
+        """
+        if not 0 < gamma <= 1:
+            raise PlanError(f"gamma must be in (0, 1], got {gamma}.")
+        if not self.tasks:
+            return {}
+        scale = mean(task.estimated_time for task in self.tasks.values())
+        children = self.children()
+        order = list(TopologicalSorter(self.edges()).static_order())
+        values: dict[str, float] = {}
+        for name in reversed(order):  # dependents before the tasks they depend on
+            task = self.tasks[name]
+            if task.status is Status.COMPLETED:
+                values[name] = 0.0
+                continue
+            future = max((values[child] for child in children[name]), default=0.0)
+            discount = gamma ** (task.estimated_time / scale)
+            values[name] = discount * (task.base_value + future)
+        return values
 
     def add_task(self, task: Task, dependents: Iterable[str] = ()) -> None:
         """Add a task; `dependents` are existing tasks that should depend on it.
@@ -74,26 +112,35 @@ class Project:
             sorter.done(*ready)
         return stages
 
-    def render(self) -> str:
-        """Return the plan as staged text that a model can read and edit against."""
+    def render(self, gamma: float = DEFAULT_GAMMA) -> str:
+        """Return the plan as staged text, each stage ordered by value (highest first)."""
         if not self.tasks:
             return "No tasks yet. Add one with topo_add_task."
-        lines: list[str] = []
+        values = self.values(gamma)
+        children = self.children()
+        done = sum(task.status is Status.COMPLETED for task in self.tasks.values())
+        scale = mean(task.estimated_time for task in self.tasks.values())
+        header = (
+            f"Plan: {done}/{len(self.tasks)} done. "
+            f"V discounted by γ={gamma:g} per average task ({scale:.2g}h)."
+        )
+        lines = [header]
         for number, stage in enumerate(self.stages(), start=1):
             lines.append(f"Stage {number}")
-            lines.extend(f"  {self.describe(name)}" for name in stage)
+            for name in sorted(stage, key=lambda n: (-values[n], n)):
+                lines.append(f"  {self.describe(name, values[name], children[name])}")
         return "\n".join(lines)
 
-    def describe(self, name: str) -> str:
-        """Return one line describing a task and its edges."""
+    def describe(self, name: str, value: float, children: set[str]) -> str:
+        """Return one line describing a task, its value and its edges."""
         task = self.tasks[name]
         line = (
             f"{STATUS_MARKERS[task.status]} {name}  {task.priority.upper()}"
-            f"  est {task.estimated_time:g}h"
+            f"  est {task.estimated_time:g}h  V={value:.2f}"
         )
         if task.depends_on:
             line += "  ← " + ", ".join(sorted(task.depends_on))
-        if children := self.dependents_of(name):
+        if children:
             line += "  → " + ", ".join(sorted(children))
         return line
 

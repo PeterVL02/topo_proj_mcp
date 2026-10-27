@@ -8,7 +8,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import ToolAnnotations
 
 from topo_proj_mcp.models import PriorityLevel, Task
-from topo_proj_mcp.task_sorting import PlanError, Project
+from topo_proj_mcp.task_sorting import DEFAULT_GAMMA, PlanError, Project
 
 mcp = MCPServer(
     "topo_mcp",
@@ -71,10 +71,18 @@ def topo_add_task(
 
 
 @mcp.tool(annotations=READ)
-def topo_get_plan() -> str:
+def topo_get_plan(gamma: float = DEFAULT_GAMMA) -> str:
     """Return the plan as stages; a task appears after everything it depends on.
 
-    Each line reads: status, name, priority, estimate, ← what it depends on,
+    Each line reads: status, name, priority, estimate, value V, ← what it depends on,
     → what depends on it. Status markers: [ ] not started, [~] in progress, [x] done.
+    Within a stage, tasks are ordered by V (highest first).
+
+    V is the task's priority plus the best value it unblocks, discounted by gamma once
+    per average-sized task of time, so short tasks and blockers of important work rank higher.
+
+    Args:
+        gamma: Discount per average task duration, in (0, 1]. Lower favours quick wins.
     """
-    return project.render()
+    with plan_errors():
+        return project.render(gamma)

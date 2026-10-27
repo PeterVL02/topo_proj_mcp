@@ -35,7 +35,7 @@ runs the server over stdio. Replace the hello `print`, because stdout is the pro
 
 **Dependencies:** 1 · **Files:** `models.py`, `task_sorting.py`, `server.py`, `tests/test_task_sorting.py` · **Scope:** M
 
-## Task 3: Discounted value ordering
+## Task 3: Discounted value ordering ✅
 
 **Description:** Add `Project.values(gamma) -> dict[str, float]` using
 `V = γ^(est/τ)·(base + max V(dependents))` (τ = mean estimate) in reverse topological order; completed tasks have V = 0.
