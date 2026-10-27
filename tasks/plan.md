@@ -128,3 +128,32 @@ Details for each task are in `tasks/todo.md`.
 
 1. ~~eta model~~: decided, longest path (parallel).
 2. ~~Discount by time~~: decided, γ is applied per average-sized task (see Discounted value).
+
+---
+
+# Phase 5: Claude Code plugin
+
+## Overview
+
+Package the repo as a Claude Code plugin that bundles the MCP server and a skill, which teaches
+Claude when and how to plan with it. It can be installed from this repo with
+`/plugin marketplace add PeterVL02/topo_proj_mcp`.
+
+## Decisions
+
+- **Same repo, plugin root = repo root.** `.claude-plugin/plugin.json` declares the server
+  **inline**, not in a root `.mcp.json`, so it doesn't clash with this repo's own project MCP
+  config, where `${CLAUDE_PLUGIN_ROOT}` doesn't exist.
+- **Server command:** `uv --directory ${CLAUDE_PLUGIN_ROOT} run topo-proj-mcp`. This requires `uv`
+  on PATH; uv fetches Python 3.14 and the dependencies on first start.
+- **One plan per project:** `TOPO_PROJECT_FILE=${CLAUDE_PROJECT_DIR}/.claude/topo-plan.json`,
+  set in the server's `env`. `save()` creates missing folders.
+- **Names:** the plugin is `topo-planner` (names may not start with `claude-`). The skill is `topo-plan`.
+
+## Task List
+
+- [ ] Task 9: `save()` creates missing parent folders
+- [ ] Task 10: Plugin manifest, marketplace and `topo-plan` skill, with a skill/tool sync test
+- [ ] Task 11: Validate the plugin, run a headless end-to-end check, document the install in the README
+
+### Checkpoint: plugin validates and the server starts from the plugin

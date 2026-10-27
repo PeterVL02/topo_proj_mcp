@@ -120,3 +120,29 @@ the overall ratio of total actual to total estimated time.
 ## Checkpoint: Complete
 - [ ] All acceptance criteria met, ruff clean, pytest green
 - [ ] Review with human
+
+# Phase 5: Claude Code plugin
+
+## Task 9: save() creates missing parent folders
+
+**Acceptance:** saving to `<dir>/.claude/topo-plan.json` works when `.claude/` doesn't exist.
+**Verification:** pytest · **Files:** `task_sorting.py`, tests · **Scope:** XS
+
+## Task 10: Plugin manifest, marketplace and skill
+
+**Acceptance:**
+- [ ] `.claude-plugin/plugin.json` declares the `topo` MCP server inline, with a per-project `TOPO_PROJECT_FILE`
+- [ ] `.claude-plugin/marketplace.json` lists the plugin with `"source": "./"`
+- [ ] `skills/topo-plan/SKILL.md` has frontmatter (`name`, `description`) and the workflow: plan → review → work → report
+- [ ] A test fails if the skill mentions a tool that doesn't exist, or misses one that does
+
+**Verification:** pytest · **Files:** `.claude-plugin/*`, `skills/topo-plan/SKILL.md`, `tests/test_plugin.py` · **Scope:** S
+
+## Task 11: Validate, end-to-end check, docs
+
+**Acceptance:**
+- [ ] `claude plugin validate .` passes
+- [ ] Headless `claude -p --plugin-dir .` can call a `topo_` tool, and the plan file lands in the project's `.claude/`
+- [ ] The README documents the plugin install
+
+**Verification:** commands above · **Files:** `README.md` · **Scope:** XS
