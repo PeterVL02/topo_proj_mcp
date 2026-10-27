@@ -157,3 +157,70 @@ Claude when and how to plan with it. It can be installed from this repo with
 - [x] Task 11: Validate the plugin, run a headless end-to-end check, document the install in the README
 
 ### Checkpoint: plugin validates and the server starts from the plugin
+
+---
+
+# Phases 6–8: Prove the token and rigidity claims
+
+## Goal
+
+topo-planner exists to replace prose planning skills (such as `agent-skills:planning-and-task-breakdown`)
+with something **algorithmic, rigid and cheaper in tokens**. The council found that this has never
+been measured. These phases measure it, fix the one known token leak, and end with a decision:
+harden the plugin or cut it back.
+
+## Findings (2026-10-27)
+
+- **Rigid: yes.** Ordering, cycle checks and dependency gating run in code. The model still
+  chooses the inputs (breakdown, estimates, priorities) and whether to use the tools at all.
+- **Tokens:** the skill costs ~880 when triggered, against ~2,640 for the prose skill. The work
+  loop is cheap (~25–35 tokens per `next_tasks` / `set_status`). **The leak:** every edit returns
+  the full plan. Building a 20-task plan echoes ~4,940 tokens back for a final plan of ~476, so
+  the cost is quadratic, and those replies stay in context for the rest of the session.
+- **Built-in Task tools** (`TaskCreate` etc., which support dependencies) are **off by default on
+  current models**. The docs cite their context cost. The competitor to beat is the prose
+  planning skill.
+
+## Decisions
+
+- **Measure before and after the fixes.** The benchmark runs once on the current code (baseline),
+  then again after the token fixes, so the gain is shown rather than assumed.
+- **The pass/fail bar is set before any run** (see Task 15).
+- **Out of scope until the Phase 8 decision:** parallel claim/owner fields, gamma learning, JSON
+  output, undo, CI.
+
+## Task List
+
+### Phase 6: Make it testable
+- [ ] Task 12: A corrupt plan file gives a clear tool error instead of killing the server
+- [ ] Task 13: Benchmark harness (headless `claude -p`, three setups, token and trigger metrics), then a baseline run
+
+### Checkpoint: baseline numbers recorded in `bench/results.md`
+
+### Phase 7: Fix the token leak
+- [ ] Task 14: Edits return a short confirmation instead of the full plan
+- [ ] Task 15: `topo_add_tasks` adds a whole plan in one atomic call; the skill prefers it
+- [ ] Task 16: Re-run the benchmark and compare against the baseline
+
+### Checkpoint: decide with the human (Phase 8)
+- **Pass** (all of): building the plan costs ≤ 50% of the tokens the prose skill uses for the same spec;
+  the skill triggers on ≥ 80% of planning prompts and ≤ 10% of trivial prompts; zero
+  dependency-order violations during execution.
+  → harden: safety across processes (two sessions in one repo), a one-line legend in
+  `get_plan`, measured numbers at the top of the README.
+- **Fail** → cut back to the skill alone, or fold the useful parts into the prose skill.
+  The cost so far is about one day.
+
+## Risks
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Model runs vary from one run to the next | Med | ≥ 2 runs per prompt; report the median and the spread |
+| The benchmark costs real tokens | Med | Planning-only prompts by default; one full execution run per setup |
+| Self-graded results | Med | Metrics come from `--output-format json` usage and tool-call logs, not judgment |
+| Two sessions in one repo overwrite each other's plan | Low (for now) | Fixed only if Phase 8 passes; noted in the README |
+
+## Open Questions
+
+1. ~~Model and runs~~: decided, Sonnet 5.5, 10 planning + 5 trivial prompts × 2 runs × 3 setups.
+2. ~~Commit the plan file?~~: decided, commit `.claude/topo-plan.json` (git gives history and undo).
