@@ -211,6 +211,18 @@ harden the plugin or cut it back.
 - **Fail** → cut back to the skill alone, or fold the useful parts into the prose skill.
   The cost so far is about one day.
 
+**Decided 2026-10-28: passed on cost and triggering → harden (Phase 8).**
+
+### Phase 8: Harden
+- [ ] Task 17: Cut execution turns: one call completes a task; `in_progress` only for long tasks
+- [ ] Task 18: Two sessions in one repo don't lose each other's edits (reload before each edit)
+- [ ] Task 19: A harder rigidity test: larger plan across several sessions, where order matters
+- [ ] Task 20: Measured numbers at the top of the README, plus a one-line legend in `get_plan`
+
+### Checkpoint: Phase 8 done
+- [ ] Forced execute run takes ≤ ~half the 28 turns it took before
+- [ ] Rigidity test shows a difference between setups, or the README says it didn't
+
 ## Risks
 
 | Risk | Impact | Mitigation |
@@ -218,7 +230,7 @@ harden the plugin or cut it back.
 | Model runs vary from one run to the next | Med | ≥ 2 runs per prompt; report the median and the spread |
 | The benchmark costs real tokens | Med | Planning-only prompts by default; one full execution run per setup |
 | Self-graded results | Med | Metrics come from `--output-format json` usage and tool-call logs, not judgment |
-| Two sessions in one repo overwrite each other's plan | Low (for now) | Fixed only if Phase 8 passes; noted in the README |
+| Two sessions in one repo overwrite each other's plan | Low (for now) | Task 18 |
 
 ## Open Questions
 
