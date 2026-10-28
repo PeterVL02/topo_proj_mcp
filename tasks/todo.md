@@ -146,3 +146,133 @@ the overall ratio of total actual to total estimated time.
 - [ ] The README documents the plugin install
 
 **Verification:** commands above · **Files:** `README.md` · **Scope:** XS
+
+# Phases 6–8: Prove the token and rigidity claims
+
+## Task 12: Corrupt plan file gives a clear error ✅
+
+**Description:** Loading a broken or invalid plan file must not crash the server at import. Start
+with an empty project in memory, keep the broken file untouched, and make every tool return
+"Plan file X is unreadable: <reason>. Fix or delete it."
+
+**Acceptance criteria:**
+- [ ] Invalid JSON, a missing key, and a cycle in the file all leave the server running
+- [ ] Tools explain the problem; the broken file is never overwritten
+
+**Verification:** pytest (in-process tool calls with a corrupt fixture file) · **Dependencies:** None · **Files:** `server.py`, `tests/test_server.py` · **Scope:** XS
+
+## Task 13: Benchmark harness and baseline ✅
+
+**Description:** Add `bench/run.py`, which runs `claude -p --output-format json` for each prompt in
+`bench/prompts.json` under three setups:
+- **none:** no planning aid
+- **prose:** the `agent-skills` planning skill
+- **topo:** `--plugin-dir .`
+
+For each run it records input, output and cache tokens, the tool calls made, and whether a
+planning tool or skill triggered. It writes `bench/results.md`. Prompts: 10 multi-step planning
+specs and 5 trivial requests where planning should *not* trigger. The prompts ask for a plan only
+and say not to implement it. One extra end-to-end run per setup executes a small plan, to count
+dependency-order violations.
+
+**Acceptance criteria:**
+- [ ] One command reproduces the whole table; the per-run raw JSON is kept in `bench/raw/` (gitignored)
+- [ ] Order violations are computed from tool and file logs, not judged by hand
+- [ ] Baseline results are committed
+
+**Verification:** a dry run with 1 prompt × 3 setups; then the full run · **Dependencies:** 12 · **Files:** `bench/run.py`, `bench/prompts.json`, `bench/results.md`, `.gitignore` · **Scope:** M
+
+## Checkpoint: baseline recorded
+
+## Task 14: Short edit replies ✅
+
+**Description:** `add` / `update` / `remove` / `set_status` reply with a single line describing
+the change (for example `added api: stage 2, ← schema, V=1.76`), plus anything that became ready
+or blocked. `topo_get_plan` stays the only full view. Update the skill to say so.
+
+**Acceptance criteria:**
+- [ ] The edit reply size doesn't grow with the plan size (a test on 5-task vs 50-task plans)
+- [ ] The skill still mentions exactly the server's tools (the sync test passes)
+
+**Verification:** pytest · **Dependencies:** 13 · **Files:** `server.py`, `task_sorting.py`, `SKILL.md`, tests · **Scope:** S
+
+## Task 15: Batch add ✅
+
+**Description:** Add `topo_add_tasks(tasks: list[...])`. Tasks in one batch can reference each
+other in any order. The whole batch is validated as one graph edit, and it either fully applies or
+changes nothing. The reply is the compact plan, sent once. The skill says to build a new plan with
+a single batch call.
+
+**Acceptance criteria:**
+- [ ] A batch with forward references works; a batch containing a cycle or an unknown name changes nothing
+- [ ] Building the 20-task plan from the findings costs ≤ ~1,000 tokens of tool I/O (measured the same way)
+
+**Verification:** pytest · **Dependencies:** 14 · **Files:** `task_sorting.py`, `server.py`, `SKILL.md`, tests · **Scope:** S
+
+## Task 16: Re-run the benchmark ✅
+
+**Acceptance criteria:**
+- [ ] `bench/results.md` shows the baseline, the after-fix numbers and the prose skill side by side, judged against the pass bar in plan.md
+
+**Verification:** the full benchmark run · **Dependencies:** 15 · **Files:** `bench/results.md` · **Scope:** XS
+
+## Checkpoint: Phase 8 decision with the human (see the pass/fail bar in plan.md)
+
+Decided 2026-10-28: passed on cost and triggering, so harden.
+
+# Phase 8: Harden
+
+## Task 17: Cut execution turns
+
+**Description:** The forced execute run took 28 turns because the skill marks every task
+`in_progress` and then `completed`. Let `topo_set_status(completed)` work straight from
+`not_started` (dependencies still enforced), and have the skill use `in_progress` only for tasks
+long enough that timing matters or another session should see the claim.
+
+**Acceptance criteria:**
+- [ ] Completing a ready `not_started` task in one call works and records `actual_hours` when given
+- [ ] Completing a task whose dependencies aren't done is still refused
+- [ ] The skill's work loop is one status call per task by default
+
+**Verification:** pytest; one forced execute run with `bench/run.py` · **Dependencies:** None · **Files:** `task_sorting.py`, `server.py`, `SKILL.md`, tests · **Scope:** S
+
+## Task 18: Two-session safety
+
+**Description:** Two Claude sessions in one repo run two server processes on the same plan file,
+and each overwrites the other's saves from its stale in-memory copy. Reload the file at the start
+of each tool call (inside `using_project`) when its modification time changed, so every edit
+applies to the latest saved plan.
+
+**Acceptance criteria:**
+- [ ] An edit written to the file by another process is kept after this process makes its own edit
+- [ ] An unreadable file still gives the clear error from Task 12 and is never overwritten
+
+**Verification:** pytest (simulate the other process by writing the file directly) · **Dependencies:** None · **Files:** `server.py`, tests · **Scope:** S
+
+## Task 19: Harder rigidity test
+
+**Description:** The 8-file test scored zero order mistakes for every setup, so it can't show
+whether strict ordering helps. Build a larger execution prompt (about 20 tasks, dependencies that
+aren't obvious from file names, work split across two `claude -p` sessions that resume the plan)
+and run it for none, prose-forced and topo-forced.
+
+**Acceptance criteria:**
+- [ ] The new prompt is in `bench/prompts.json` and order mistakes are counted as before
+- [ ] `bench/results.md` reports the results, whether or not the setups differ
+
+**Verification:** the benchmark run · **Dependencies:** 17 · **Files:** `bench/prompts.json`, `bench/run.py`, `bench/results.md` · **Scope:** M
+
+## Task 20: README numbers and plan legend
+
+**Description:** Put the measured cost and triggering numbers at the top of the README, and add
+a one-line legend to `topo_get_plan`'s output so the model can read it without the skill.
+
+**Acceptance criteria:**
+- [ ] README opens with the numbers from `bench/results.md` and links to it
+- [ ] `topo_get_plan` output starts with a one-line legend
+
+**Verification:** pytest · **Dependencies:** 17, 19 · **Files:** `README.md`, `task_sorting.py`, tests · **Scope:** XS
+
+## Checkpoint: Phase 8 done
+- [ ] All tests pass, ruff clean
+- [ ] Forced execute run takes about half the turns it did before, or fewer

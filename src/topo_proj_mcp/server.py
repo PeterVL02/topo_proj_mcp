@@ -5,6 +5,7 @@ import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import NotRequired, TypedDict
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -22,10 +23,19 @@ mcp = MCPServer(
     ),
 )
 project_file = Path(os.environ.get("TOPO_PROJECT_FILE", "project.json"))
-project = Project.load(project_file)
-project_lock = (
-    threading.Lock()
-)  # ponytail: one global lock; fine for one project per server
+
+
+def load_project() -> tuple[Project, str | None]:
+    """Load the plan file; if it is unreadable, return an empty project and the reason."""
+    try:
+        return Project.load(project_file), None
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
+        return Project(), f"{type(error).__name__}: {error}"
+
+
+project, load_error = load_project()
+# ponytail: one global lock; fine for one project per server
+project_lock = threading.Lock()
 
 EDIT = ToolAnnotations(
     read_only_hint=False,
@@ -41,19 +51,69 @@ def using_project() -> Generator[None]:
     """Hold the project lock and turn PlanError into ToolError for the model.
 
     The SDK runs sync tools in worker threads, so parallel calls would otherwise race
-    on the shared project and its save file.
+    on the shared project and its save file. If the plan file was unreadable, it is
+    retried here, and nothing runs (or overwrites it) until it loads.
     """
+    global project, load_error
     with project_lock:
+        if load_error:
+            project, load_error = load_project()
+        if load_error:
+            raise ToolError(
+                f"Plan file {project_file} is unreadable ({load_error}). Fix or delete "
+                "it; no changes are saved until it loads."
+            )
         try:
             yield
         except PlanError as error:
             raise ToolError(str(error)) from error
 
 
-def save_and_render() -> str:
-    """Save the project after an edit and return the updated plan."""
+class NewTask(TypedDict):
+    name: str
+    estimated_time: float
+    priority: NotRequired[PriorityLevel]
+    description: NotRequired[str]
+    depends_on: NotRequired[list[str]]
+    dependents: NotRequired[list[str]]
+
+
+def to_task(spec: NewTask) -> Task:
+    """Build a Task from a tool argument."""
+    return Task(
+        name=spec["name"],
+        description=spec.get("description", ""),
+        priority=PriorityLevel(spec.get("priority", PriorityLevel.MEDIUM)),
+        estimated_time=spec["estimated_time"],
+        depends_on=set(spec.get("depends_on", ())),
+    )
+
+
+def save_and_summarize(prefix: str, name: str) -> str:
+    """Save after an edit and return one line about the changed task.
+
+    Edits answer with a single line so that building a plan costs tokens in
+    proportion to its size, not its size squared; topo_get_plan shows the whole plan.
+    """
     project.save(project_file)
-    return project.render()
+    return f"{prefix}: {project.summarize_task(name)}"
+
+
+@mcp.tool(annotations=EDIT)
+def topo_add_tasks(tasks: list[NewTask]) -> str:
+    """Add several tasks in one call (best for a new plan) and return the full plan.
+
+    Tasks may reference each other in any order. Either all are added or none are.
+    Each item has the same fields as topo_add_task: name, estimated_time (hours > 0),
+    and optionally priority, description, depends_on and dependents.
+    """
+    with using_project():
+        project.add_tasks(
+            [to_task(spec) for spec in tasks],
+            {spec["name"]: spec.get("dependents", []) for spec in tasks},
+        )
+        project.save(project_file)
+        return project.render()
 
 
 @mcp.tool(annotations=EDIT)
@@ -65,7 +125,7 @@ def topo_add_task(
     depends_on: list[str] | None = None,
     dependents: list[str] | None = None,
 ) -> str:
-    """Add a task to the plan and return the updated plan.
+    """Add one task to the plan and return its plan line.
 
     Args:
         name: Unique task name, used as its ID by every other tool.
@@ -76,16 +136,16 @@ def topo_add_task(
         dependents: Existing tasks that must wait for this one. To insert between A and B,
             pass depends_on=[A] and dependents=[B].
     """
-    task = Task(
-        name=name,
-        description=description,
-        priority=priority,
-        estimated_time=estimated_time,
-        depends_on=set(depends_on or ()),
-    )
+    spec: NewTask = {
+        "name": name,
+        "estimated_time": estimated_time,
+        "priority": priority,
+        "description": description,
+        "depends_on": depends_on or [],
+    }
     with using_project():
-        project.add_task(task, dependents or ())
-        return save_and_render()
+        project.add_task(to_task(spec), dependents or ())
+        return save_and_summarize("Added", name)
 
 
 @mcp.tool(annotations=EDIT)
@@ -97,7 +157,7 @@ def topo_update_task(
     depends_on: list[str] | None = None,
     dependents: list[str] | None = None,
 ) -> str:
-    """Change a task's fields or move it in the plan, and return the updated plan.
+    """Change a task's fields or move it in the plan, and return its new plan line.
 
     Only the arguments you pass are changed. To move a task, pass depends_on and/or
     dependents: each list *replaces* that side's edges (pass [] to clear it).
@@ -119,7 +179,7 @@ def topo_update_task(
             depends_on=depends_on,
             dependents=dependents,
         )
-        return save_and_render()
+        return save_and_summarize("Updated", name)
 
 
 @mcp.tool(
@@ -131,7 +191,7 @@ def topo_update_task(
     )
 )
 def topo_remove_task(name: str, bridge: bool = True) -> str:
-    """Remove a task and return the updated plan.
+    """Remove a task and say how the tasks around it were reconnected.
 
     Args:
         name: The task to remove.
@@ -139,8 +199,14 @@ def topo_remove_task(name: str, bridge: bool = True) -> str:
             instead, so the ordering is preserved. If false, its edges are just dropped.
     """
     with using_project():
+        parents = sorted(project.require(name).depends_on)
+        children = sorted(project.children()[name])
         project.remove_task(name, bridge)
-        return save_and_render()
+        project.save(project_file)
+        reply = f"Removed {name}."
+        if bridge and parents and children:
+            reply += f" {', '.join(children)} now wait for {', '.join(parents)}."
+        return reply
 
 
 @mcp.tool(
@@ -154,7 +220,7 @@ def topo_remove_task(name: str, bridge: bool = True) -> str:
 def topo_set_status(
     name: str, status: Status, actual_hours: float | None = None
 ) -> str:
-    """Mark a task not_started, in_progress or completed, and return what is ready next.
+    """Mark a task not_started, in_progress or completed; reply with what it unlocked.
 
     A task can only be started or completed once everything it depends on is completed.
     Start and completion times are recorded to compare actual time with the estimate.
@@ -166,9 +232,15 @@ def topo_set_status(
             between in_progress and completed, which includes any idle time.
     """
     with using_project():
+        before = set(project.next_tasks())
         project.set_status(name, status, actual_hours)
         project.save(project_file)
-        return f"{name}: {status}.\n\n{project.render_next()}"
+        ready = project.next_tasks()
+        reply = f"{name}: {status}."
+        if unlocked := sorted(set(ready) - before - {name}):
+            reply += f" Newly ready: {', '.join(unlocked)}."
+        reply += f" Next best: {ready[0]}." if ready else " All tasks are done."
+        return reply
 
 
 @mcp.tool(annotations=READ)

@@ -111,21 +111,36 @@ class Project:
         """Add a task; `dependents` are existing tasks that should depend on it.
 
         Raises:
-            PlanError: If the name is blank or taken, the estimate is not positive,
-                a referenced task does not exist, or the result would contain a cycle.
+            PlanError: See `add_tasks`.
         """
-        if not task.name.strip():
-            raise PlanError("Task name must not be blank.")
-        if task.name in self.tasks:
-            raise PlanError(
-                f"Task '{task.name}' already exists. Use topo_update_task to change it."
-            )
-        check_estimate(task.estimated_time)
+        self.add_tasks([task], {task.name: list(dependents)})
+
+    def add_tasks(
+        self, tasks: list[Task], dependents: dict[str, list[str]] | None = None
+    ) -> None:
+        """Add several tasks as one edit; they may reference each other in any order.
+
+        `dependents` maps a new task's name to tasks (new or existing) that should
+        depend on it. Either every task is added or none is.
+
+        Raises:
+            PlanError: If a name is blank, taken or repeated, an estimate is not
+                positive, a referenced task does not exist, or the result has a cycle.
+        """
         edges = self.edges()
-        edges[task.name] = set(task.depends_on)
-        link_dependents(edges, task.name, dependents)
+        for task in tasks:
+            if not task.name.strip():
+                raise PlanError("Task name must not be blank.")
+            if task.name in edges:
+                raise PlanError(
+                    f"Task '{task.name}' already exists. Use topo_update_task to change it."
+                )
+            check_estimate(task.estimated_time)
+            edges[task.name] = set(task.depends_on)
+        for name, children in (dependents or {}).items():
+            link_dependents(edges, name, children)
         validate(edges)
-        self.tasks[task.name] = task
+        self.tasks.update((task.name, task) for task in tasks)
         self.apply_edges(edges)
 
     def update_task(
@@ -382,6 +397,11 @@ class Project:
             for name in sorted(stage, key=lambda n: (-values[n], n)):
                 lines.append(f"  {described[name]}")
         return "\n".join(lines)
+
+    def summarize_task(self, name: str, gamma: float = DEFAULT_GAMMA) -> str:
+        """Return one task's plan line with its stage number."""
+        stage = next(i for i, s in enumerate(self.stages(), start=1) if name in s)
+        return f"{self.describe_all(self.values(gamma))[name]}  (stage {stage})"
 
     def describe_all(self, values: dict[str, float]) -> dict[str, str]:
         """Return one line per task: status, priority, estimate, eta, value and edges."""

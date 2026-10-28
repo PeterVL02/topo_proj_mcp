@@ -315,3 +315,34 @@ def test_save_creates_missing_folders(tmp_path: Path) -> None:
     path = tmp_path / ".claude" / "topo-plan.json"
     make_diamond().save(path)
     assert Project.load(path).tasks.keys() == {"A", "B", "C", "D"}
+
+
+def test_add_tasks_batch_allows_forward_references() -> None:
+    """Tasks in one batch may reference each other in any order."""
+    project = Project()
+    project.add_tasks([make_task("b", {"a"}), make_task("a")])
+    assert project.stages() == [["a"], ["b"]]
+
+
+def test_add_tasks_batch_dependents_within_batch() -> None:
+    """dependents may point at tasks from the same batch."""
+    project = Project()
+    project.add_tasks([make_task("x"), make_task("y")], dependents={"x": ["y"]})
+    assert project.tasks["y"].depends_on == {"x"}
+
+
+@pytest.mark.parametrize(
+    "batch",
+    [
+        [make_task("E", {"F"}), make_task("F", {"E"})],  # cycle
+        [make_task("E"), make_task("E")],  # duplicate inside the batch
+        [make_task("E", {"missing"})],  # unknown name
+        [make_task("E"), make_task("F", estimated_time=0)],  # one bad estimate
+    ],
+)
+def test_add_tasks_batch_is_all_or_nothing(batch: list[Task]) -> None:
+    """One invalid task rejects the whole batch and leaves the project unchanged."""
+    project = make_diamond()
+    with pytest.raises(PlanError):
+        project.add_tasks(batch)
+    assert sorted(project.tasks) == ["A", "B", "C", "D"]

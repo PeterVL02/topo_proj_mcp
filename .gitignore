@@ -12,3 +12,6 @@ wheels/
 # Planner state (TOPO_PROJECT_FILE default)
 project.json
 project.json.tmp
+
+# Benchmark raw transcripts
+bench/raw/
